@@ -1,5 +1,5 @@
 // The URLs you want to redirect from
-const sourceUrls = ["x.com", "youtube.com", "xiaohongshu.com"];
+const sourceUrls = ["x.com", "youtube.com", "twitter.com", "xiaohongshu.com"];
 // The URL you want to redirect to
 const destinationUrl = "https://google.com";
 
