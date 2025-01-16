@@ -3,15 +3,15 @@ const sourceUrls = ["x.com", "youtube.com", "twitter.com", "xiaohongshu.com"];
 // The URL you want to redirect to
 const destinationUrl = "https://google.com";
 
-chrome.webNavigation.onBeforeNavigate.addListener(function (details) {
-  // 获取URL的主域名
-  const url = new URL(details.url);
+// 监听标签页更新事件
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // 只在页面完成加载时检查
+  if (changeInfo.status !== 'complete') return;
+
+  const url = new URL(tab.url);
   const hostname = url.hostname;
 
-  // 检查是否直接访问被屏蔽的网站
   if (sourceUrls.some(blockedSite => hostname === blockedSite || hostname === `www.${blockedSite}`)) {
-    chrome.tabs.update(details.tabId, {
-      url: destinationUrl
-    });
+    chrome.tabs.update(tabId, { url: destinationUrl });
   }
 }); 

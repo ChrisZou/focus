@@ -4,7 +4,8 @@
   "version": "1.0",
   "description": "Such a loser if you find excuses again!!!",
   "permissions": [
-    "webNavigation"
+    "webNavigation",
+    "tabs"
   ],
   "background": {
     "service_worker": "background.js"
