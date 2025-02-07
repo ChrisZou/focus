@@ -4,7 +4,8 @@ const blockedUrls = ["x.com", "youtube.com", "twitter.com", "xiaohongshu.com"];
 const destinationUrl = "https://google.com";
 // 允许访问的路径列表
 const allowList = [
-  "xiaohongshu.com/zhibo/obs"
+  "xiaohongshu.com/zhibo/obs",
+  "creator.xiaohongshu.com",
 ];
 
 // 临时禁用状态
