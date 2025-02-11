@@ -12,13 +12,13 @@ const allowList = [
 let isTemporarilyDisabled = false;
 
 // 临时禁用阻止功能
-function temporarilyDisableBlocking() {
+function temporarilyDisableBlocking(minutes) {
   isTemporarilyDisabled = true;
 
-  // 1分钟后重新启用
+  // 指定时间后重新启用
   setTimeout(() => {
     isTemporarilyDisabled = false;
-  }, 60 * 1000);
+  }, minutes * 60 * 1000);
 }
 
 // 监听标签页更新事件
@@ -40,7 +40,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // 监听来自扩展popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'temporarilyDisable') {
-    temporarilyDisableBlocking();
+    temporarilyDisableBlocking(request.minutes);
     sendResponse({ success: true });
   }
 }); 
