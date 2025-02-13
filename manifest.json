@@ -5,7 +5,8 @@
   "description": "Such a loser if you find excuses again!!!",
   "permissions": [
     "webNavigation",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "background": {
     "service_worker": "background.js"
