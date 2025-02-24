@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Focus - 保持专注</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: white;
+      color: #2c3e50;
+      line-height: 1.6;
+    }
+
+    h1 {
+      margin-bottom: 2rem;
+      color: #2c3e50;
+      font-size: 2rem;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2rem;
+      margin: 2rem 0;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .stat-item {
+      background: #f8f9fa;
+      padding: 1.5rem;
+      border-radius: 15px;
+      text-align: center;
+    }
+
+    .number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #3498db;
+      margin-bottom: 0.5rem;
+    }
+
+    .label {
+      color: #7f8c8d;
+      font-size: 0.9rem;
+    }
+
+    .site {
+      color: #95a5a6;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    .quote {
+      font-style: italic;
+      color: #7f8c8d;
+      margin: 2rem 0;
+      padding: 1rem;
+      border-left: 4px solid #3498db;
+      background: #f8f9fa;
+      border-radius: 0 10px 10px 0;
+      box-sizing: border-box;
+      max-width: 600px;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>保持专注</h1>
+  <div class="stats">
+    <div class="stat-item">
+      <div class="number" id="todayCount">0</div>
+      <div class="label">今日已阻止访问次数</div>
+      <div class="site" id="siteName"></div>
+    </div>
+    <div class="stat-item">
+      <div class="number" id="savedTime">0</div>
+      <div class="label">已节省时间（小时）</div>
+    </div>
+  </div>
+  <div class="quote" id="quote"></div>
+
+  <script>
+    // 获取URL参数
+    const params = new URLSearchParams(window.location.search);
+    const site = params.get('site');
+    const count = parseInt(params.get('count')) || 0;
+    const savedTime = parseInt(params.get('savedTime')) || 0;
+    const avgTime = parseInt(params.get('avgTime')) || 30;
+
+    // 更新统计数据
+    document.getElementById('todayCount').textContent = count;
+    document.getElementById('savedTime').textContent = (savedTime / 60).toFixed(1);
+    document.getElementById('siteName').textContent = site;
+
+    // 随机名言
+    const quotes = [
+      '"专注是天才和卓越的共同特征。" —— 爱默生',
+      '"把时间用在准备上的人，他的成功不是偶然。" —— 比尔·盖茨',
+      '"注意力是一种有限的资源，要像管理金钱一样管理它。" —— 大卫·艾伦',
+      '"成功的秘诀在于全神贯注。" —— 爱因斯坦',
+      '"把注意力集中在重要的事情上，而不是紧急的事情上。" —— 史蒂芬·柯维'
+    ];
+    document.getElementById('quote').textContent = quotes[Math.floor(Math.random() * quotes.length)];
+  </script>
+</body>
+
+</html>

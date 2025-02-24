@@ -5,41 +5,97 @@
   <meta charset="UTF-8">
   <style>
     body {
-      width: 200px;
-      padding: 10px;
-      font-family: Arial, sans-serif;
+      width: 280px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      margin: 0;
+    }
+
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      margin: 0 0 8px 0;
+    }
+
+    .stats {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #34495e;
+    }
+
+    .stats .number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #3498db;
+      margin: 4px 0;
     }
 
     button {
       width: 100%;
-      padding: 8px;
-      background-color: #4CAF50;
-      color: white;
+      padding: 10px;
+      margin: 8px 0;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
+      background: #3498db;
+      color: white;
       cursor: pointer;
-      margin-bottom: 8px;
-    }
-
-    button:last-child {
-      margin-bottom: 0;
+      font-size: 14px;
+      transition: background 0.3s;
     }
 
     button:hover {
-      background-color: #45a049;
+      background: #2980b9;
     }
 
     button:disabled {
-      background-color: #cccccc;
+      background: #bdc3c7;
       cursor: not-allowed;
+    }
+
+    .countdown {
+      text-align: center;
+      color: #e74c3c;
+      font-weight: bold;
+      margin-top: 12px;
+      font-size: 14px;
     }
   </style>
 </head>
 
 <body>
-  <button id="disable1MinButton">暂停阻止1分钟</button>
-  <button id="disable5MinButton">暂停阻止5分钟</button>
-  <button id="disable1HourButton">暂停阻止1小时</button>
+  <div class="container">
+    <div class="header">
+      <h1>Focus 专注助手</h1>
+      <div>保持专注，提升效率</div>
+    </div>
+
+    <div class="stats">
+      <div>今日已阻止访问</div>
+      <div class="number" id="todayCount">0</div>
+      <div>次干扰</div>
+    </div>
+
+    <button id="disable1MinButton">暂停阻止 1 分钟</button>
+    <button id="disable5MinButton">暂停阻止 5 分钟</button>
+    <button id="disable1HourButton">暂停阻止 1 小时</button>
+    <div class="countdown" id="countdown"></div>
+  </div>
   <script src="popup.js"></script>
 </body>
 
