@@ -16,13 +16,24 @@ const averageTimeSpent = {
   "bilibili.com": 45
 };
 
-// 生成UUID v4
+// 生成UUID v7
 function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
+  // 获取当前时间戳（毫秒）
+  const timestamp = Date.now();
+
+  // 将时间戳转换为大端字节序的48位十六进制字符串
+  const timestampHex = timestamp.toString(16).padStart(12, '0');
+
+  // 生成随机部分（共62位，这里用78个字符表示）
+  const randomHex = Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 16).toString(16)
+  ).join('');
+
+  // 组装UUID v7
+  // 格式: tttttttt-tttt-7nnn-nnnn-nnnnnnnnnnnn
+  // 其中t是时间戳位，7是版本，n是随机位
+  return `${timestampHex.slice(0, 8)}-${timestampHex.slice(8, 12)}-7${randomHex.slice(0, 3)}-${(parseInt(randomHex.slice(3, 4), 16) & 0x3 | 0x8).toString(16)
+    }${randomHex.slice(4, 7)}-${randomHex.slice(7, 19)}`;
 }
 
 // 获取或创建用户ID
@@ -111,6 +122,17 @@ async function checkDisableStatus() {
   return state.isDisabled;
 }
 
+// 从URL中提取域名
+function extractDomain(url) {
+  try {
+    const urlObj = new URL(url);
+    // 移除 www. 前缀
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch (e) {
+    return url;
+  }
+}
+
 // 监听导航开始前的事件
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   // 只处理主框架的导航
@@ -119,12 +141,15 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   // 如果临时禁用了阻止功能，直接返回
   if (await checkDisableStatus()) return;
 
+  // 获取域名
+  const domain = extractDomain(details.url);
+
   // 检查是否在允许列表中
-  const isAllowed = allowList.some(allowedPath => details.url.includes(allowedPath));
+  const isAllowed = allowList.some(allowedPath => domain === allowedPath);
   if (isAllowed) return;
 
   // 检查是否需要阻止
-  const blockedSite = blockedUrls.find(blockedSite => details.url.includes(blockedSite));
+  const blockedSite = blockedUrls.find(blockedSite => domain === blockedSite);
   if (blockedSite) {
     // 更新访问统计
     const stats = await updateVisitStats(blockedSite);
