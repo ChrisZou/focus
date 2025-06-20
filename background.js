@@ -1,20 +1,33 @@
-// The URLs you want to redirect from
-const blockedUrls = ["x.com", "youtube.com", "twitter.com", "xiaohongshu.com", "bilibili.com"];
-// The URL you want to redirect to
+// 默认的被屏蔽网站列表
+const defaultBlockedSites = [
+  { domain: "x.com", name: "X (Twitter)", avgTime: 30 },
+  { domain: "youtube.com", name: "YouTube", avgTime: 45 },
+  { domain: "twitter.com", name: "Twitter", avgTime: 30 },
+  { domain: "xiaohongshu.com", name: "小红书", avgTime: 40 },
+  { domain: "bilibili.com", name: "B站", avgTime: 45 }
+];
+
+// 重定向目标URL
 const destinationUrl = chrome.runtime.getURL('redirect.html');
+
 // 允许访问的路径列表
 const allowList = [
   "creator.xiaohongshu.com",
 ];
 
-// 每个网站的预估平均使用时长（分钟）
-const averageTimeSpent = {
-  "x.com": 30,
-  "youtube.com": 45,
-  "twitter.com": 30,
-  "xiaohongshu.com": 40,
-  "bilibili.com": 45
-};
+// 获取用户配置的屏蔽网站列表
+async function getBlockedSites() {
+  const data = await chrome.storage.local.get(['blockedSites']);
+  return data.blockedSites || defaultBlockedSites;
+}
+
+// 初始化默认屏蔽网站列表
+async function initializeBlockedSites() {
+  const data = await chrome.storage.local.get(['blockedSites']);
+  if (!data.blockedSites) {
+    await chrome.storage.local.set({ blockedSites: defaultBlockedSites });
+  }
+}
 
 // 生成UUID v7
 function generateUUID() {
@@ -67,13 +80,13 @@ async function updateVisitStats(blockedSite) {
   if (!stats[today]) {
     stats[today] = {};
   }
-  if (!stats[today][blockedSite]) {
-    stats[today][blockedSite] = 0;
+  if (!stats[today][blockedSite.domain]) {
+    stats[today][blockedSite.domain] = 0;
   }
 
   // 增加计数和保存的时间
-  stats[today][blockedSite]++;
-  totalSavedTime += averageTimeSpent[blockedSite];
+  stats[today][blockedSite.domain]++;
+  totalSavedTime += blockedSite.avgTime;
 
   // 保存更新后的统计数据
   await chrome.storage.local.set({
@@ -82,7 +95,7 @@ async function updateVisitStats(blockedSite) {
   });
 
   return {
-    todayCount: stats[today][blockedSite],
+    todayCount: stats[today][blockedSite.domain],
     totalSavedMinutes: totalSavedTime
   };
 }
@@ -148,18 +161,21 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const isAllowed = allowList.some(allowedPath => domain === allowedPath);
   if (isAllowed) return;
 
+  // 获取用户配置的屏蔽网站列表
+  const blockedSites = await getBlockedSites();
+
   // 检查是否需要阻止
-  const blockedSite = blockedUrls.find(blockedSite => domain === blockedSite);
+  const blockedSite = blockedSites.find(site => domain === site.domain);
   if (blockedSite) {
     // 更新访问统计
     const stats = await updateVisitStats(blockedSite);
 
     // 构建重定向URL，包含统计信息
     const redirectUrl = new URL(destinationUrl);
-    redirectUrl.searchParams.set('site', blockedSite);
+    redirectUrl.searchParams.set('site', blockedSite.name);
     redirectUrl.searchParams.set('count', stats.todayCount);
     redirectUrl.searchParams.set('savedTime', stats.totalSavedMinutes);
-    redirectUrl.searchParams.set('avgTime', averageTimeSpent[blockedSite]);
+    redirectUrl.searchParams.set('avgTime', blockedSite.avgTime);
 
     // 取消当前导航并重定向到目标URL
     chrome.tabs.update(details.tabId, { url: redirectUrl.toString() });
@@ -170,6 +186,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 chrome.runtime.onInstalled.addListener(async () => {
   // 确保用户ID存在
   await getUserId();
+  // 初始化默认屏蔽网站列表
+  await initializeBlockedSites();
 });
 
 // 监听来自扩展popup的消息
@@ -190,5 +208,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })
       .catch(error => sendResponse({ isDisabled: false, remainingSeconds: 0, error: error.message }));
     return true; // 表示我们会异步发送响应
+  } else if (request.action === 'getBlockedSites') {
+    getBlockedSites()
+      .then(sites => sendResponse({ success: true, sites }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'addBlockedSite') {
+    const { domain, name, avgTime } = request;
+    getBlockedSites()
+      .then(async sites => {
+        // 检查是否已存在
+        if (sites.some(site => site.domain === domain)) {
+          sendResponse({ success: false, error: '该网站已在屏蔽列表中' });
+          return;
+        }
+        // 添加新网站
+        sites.push({ domain, name, avgTime });
+        await chrome.storage.local.set({ blockedSites: sites });
+        sendResponse({ success: true, sites });
+      })
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'removeBlockedSite') {
+    const { domain } = request;
+    getBlockedSites()
+      .then(async sites => {
+        const filteredSites = sites.filter(site => site.domain !== domain);
+        await chrome.storage.local.set({ blockedSites: filteredSites });
+        sendResponse({ success: true, sites: filteredSites });
+      })
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'updateBlockedSite') {
+    const { domain, name, avgTime } = request;
+    getBlockedSites()
+      .then(async sites => {
+        const siteIndex = sites.findIndex(site => site.domain === domain);
+        if (siteIndex === -1) {
+          sendResponse({ success: false, error: '找不到该网站' });
+          return;
+        }
+        sites[siteIndex] = { domain, name, avgTime };
+        await chrome.storage.local.set({ blockedSites: sites });
+        sendResponse({ success: true, sites });
+      })
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
   }
 }); 

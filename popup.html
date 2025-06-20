@@ -75,6 +75,15 @@
       margin-top: 12px;
       font-size: 14px;
     }
+
+    .settings-btn {
+      background: #34495e;
+      margin-top: 12px;
+    }
+
+    .settings-btn:hover {
+      background: #2c3e50;
+    }
   </style>
 </head>
 
@@ -95,6 +104,8 @@
     <button id="disable5MinButton">暂停阻止 5 分钟</button>
     <button id="disable1HourButton">暂停阻止 1 小时</button>
     <div class="countdown" id="countdown"></div>
+
+    <button class="settings-btn" id="settingsBtn">⚙️ 设置</button>
   </div>
   <script src="popup.js"></script>
 </body>

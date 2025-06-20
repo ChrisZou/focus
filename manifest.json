@@ -36,5 +36,6 @@
         "<all_urls>"
       ]
     }
-  ]
+  ],
+  "options_page": "settings.html"
 }

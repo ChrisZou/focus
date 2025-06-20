@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', async () => {
+  // 控制面板元素
   const disable1MinButton = document.getElementById('disable1MinButton');
   const disable5MinButton = document.getElementById('disable5MinButton');
   const disable1HourButton = document.getElementById('disable1HourButton');
   const countdownElement = document.getElementById('countdown');
   const todayCountElement = document.getElementById('todayCount');
+  const settingsBtn = document.getElementById('settingsBtn');
 
   // 获取今日统计
   const today = new Date().toISOString().split('T')[0];
@@ -58,6 +60,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   disable1MinButton.addEventListener('click', () => disableForDuration(disable1MinButton, 1));
   disable5MinButton.addEventListener('click', () => disableForDuration(disable5MinButton, 5));
   disable1HourButton.addEventListener('click', () => disableForDuration(disable1HourButton, 60));
+
+  // 设置按钮点击事件
+  settingsBtn.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
+  });
 
   // 初始化时检查状态
   await updateStatus();
