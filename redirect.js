@@ -14,17 +14,14 @@ async function loadCustomMessage() {
     // 显示来源和来源头像（如果有配置）
     const source = (data.messageSource || '').trim();
     const avatar = (data.messageAvatar || '').trim();
-    if (source || avatar) {
-      const sourceEl = document.getElementById('messageSource');
+    if (avatar) {
       const avatarEl = document.getElementById('sourceAvatar');
-      const nameEl = document.getElementById('sourceName');
-
-      if (avatar) {
-        avatarEl.src = avatar;
-        avatarEl.onload = () => { avatarEl.style.display = 'block'; };
-      }
-      nameEl.textContent = source;
-      sourceEl.classList.add('show');
+      avatarEl.src = avatar;
+      avatarEl.onload = () => { avatarEl.style.display = 'block'; };
+    }
+    if (source) {
+      document.getElementById('sourceName').textContent = source;
+      document.getElementById('messageSource').classList.add('show');
     }
   } catch (error) {
     console.error('加载自定义提示语失败:', error);

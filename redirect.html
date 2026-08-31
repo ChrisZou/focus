@@ -30,26 +30,24 @@
       white-space: pre-wrap;
     }
 
+    #sourceAvatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+
     .message-source {
       display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.8rem;
       margin-bottom: 2rem;
       color: #7f8c8d;
       font-size: 1.1rem;
     }
 
     .message-source.show {
-      display: flex;
-    }
-
-    .message-source img {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      object-fit: cover;
-      display: none;
+      display: block;
     }
 
     .stats {
@@ -89,9 +87,9 @@
 </head>
 
 <body>
+  <img id="sourceAvatar" alt="">
   <h1>保持专注</h1>
   <div class="message-source" id="messageSource">
-    <img id="sourceAvatar" alt="">
     <span id="sourceName"></span>
   </div>
   <div class="stats">
