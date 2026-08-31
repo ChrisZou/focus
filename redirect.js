@@ -23,7 +23,7 @@ async function loadCustomMessage() {
         avatarEl.src = avatar;
         avatarEl.onload = () => { avatarEl.style.display = 'block'; };
       }
-      nameEl.textContent = source ? `—— ${source}` : '';
+      nameEl.textContent = source;
       sourceEl.classList.add('show');
     }
   } catch (error) {
