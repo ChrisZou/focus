@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 自定义提示语元素
   const customMessageInput = document.getElementById('customMessageInput');
+  const messageSourceInput = document.getElementById('messageSourceInput');
+  const messageAvatarInput = document.getElementById('messageAvatarInput');
   const saveMessageBtn = document.getElementById('saveMessageBtn');
 
   // 统计元素
@@ -274,9 +276,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 加载自定义提示语
   async function loadCustomMessage() {
     try {
-      const data = await chrome.storage.local.get(['customMessage']);
-      const customMessage = data.customMessage || '保持专注';
-      customMessageInput.value = customMessage;
+      const data = await chrome.storage.local.get(['customMessage', 'messageSource', 'messageAvatar']);
+      customMessageInput.value = data.customMessage || '保持专注';
+      messageSourceInput.value = data.messageSource || '';
+      messageAvatarInput.value = data.messageAvatar || '';
     } catch (error) {
       console.error('加载自定义提示语失败:', error);
     }
@@ -285,9 +288,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 保存自定义提示语
   saveMessageBtn.addEventListener('click', async () => {
     const message = customMessageInput.value.trim() || '保持专注';
+    const source = messageSourceInput.value.trim();
+    const avatar = messageAvatarInput.value.trim();
+
+    if (avatar && !/^https?:\/\//i.test(avatar)) {
+      showMessage('来源头像请填写有效的图片URL（以 http:// 或 https:// 开头）', 'error');
+      return;
+    }
 
     try {
-      await chrome.storage.local.set({ customMessage: message });
+      await chrome.storage.local.set({
+        customMessage: message,
+        messageSource: source,
+        messageAvatar: avatar
+      });
       showMessage('提示语保存成功！', 'success');
     } catch (error) {
       console.error('保存自定义提示语失败:', error);
@@ -307,8 +321,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveBtn.click();
       }
     }
-    // 自定义提示语输入框中的Enter键
-    if (e.key === 'Enter' && document.activeElement === customMessageInput) {
+    // 来源输入框中的Enter键保存；提示语textarea中用Ctrl/Cmd+Enter保存
+    if (e.key === 'Enter' && [messageSourceInput, messageAvatarInput].includes(document.activeElement)) {
+      saveMessageBtn.click();
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && document.activeElement === customMessageInput) {
       saveMessageBtn.click();
     }
   });

@@ -21,12 +21,34 @@
     }
 
     h1 {
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
       color: #2c3e50;
       font-size: 3rem;
       max-width: 800px;
       text-align: center;
       word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    .message-source {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 2rem;
+      color: #7f8c8d;
+      font-size: 1.1rem;
+    }
+
+    .message-source.show {
+      display: flex;
+    }
+
+    .message-source img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: none;
     }
 
     .stats {
@@ -67,6 +89,10 @@
 
 <body>
   <h1>保持专注</h1>
+  <div class="message-source" id="messageSource">
+    <img id="sourceAvatar" alt="">
+    <span id="sourceName"></span>
+  </div>
   <div class="stats">
     <div class="stat-item">
       <div class="number" id="todayCount">0</div>

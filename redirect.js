@@ -8,9 +8,24 @@ const avgTime = parseInt(params.get('avgTime')) || 30;
 // 加载自定义提示语
 async function loadCustomMessage() {
   try {
-    const data = await chrome.storage.local.get(['customMessage']);
-    const customMessage = data.customMessage || '保持专注';
-    document.querySelector('h1').textContent = customMessage;
+    const data = await chrome.storage.local.get(['customMessage', 'messageSource', 'messageAvatar']);
+    document.querySelector('h1').textContent = data.customMessage || '保持专注';
+
+    // 显示来源和来源头像（如果有配置）
+    const source = (data.messageSource || '').trim();
+    const avatar = (data.messageAvatar || '').trim();
+    if (source || avatar) {
+      const sourceEl = document.getElementById('messageSource');
+      const avatarEl = document.getElementById('sourceAvatar');
+      const nameEl = document.getElementById('sourceName');
+
+      if (avatar) {
+        avatarEl.src = avatar;
+        avatarEl.onload = () => { avatarEl.style.display = 'block'; };
+      }
+      nameEl.textContent = source ? `—— ${source}` : '';
+      sourceEl.classList.add('show');
+    }
   } catch (error) {
     console.error('加载自定义提示语失败:', error);
     document.querySelector('h1').textContent = '保持专注';
