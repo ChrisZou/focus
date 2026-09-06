@@ -383,6 +383,38 @@
         <!-- 动态生成 -->
       </div>
     </div>
+
+    <!-- 白名单管理 -->
+    <div class="section">
+      <h2 class="section-title">白名单</h2>
+      <p class="section-description">
+        即使某个网站被屏蔽，白名单里的子域名或页面仍然允许访问。规则支持两种写法：纯域名（如 creator.xiaohongshu.com，匹配该域名及其子域名）和域名+路径前缀（如 space.bilibili.com/12345，匹配该路径及其下所有页面）。
+      </p>
+
+      <button class="btn btn-success" id="addAllowBtn">
+        ✅ 添加白名单规则
+      </button>
+
+      <!-- 添加白名单表单 -->
+      <div class="add-form" id="addAllowForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="allowRuleInput">域名或域名+路径</label>
+            <input type="text" id="allowRuleInput" placeholder="例如: space.bilibili.com/12345">
+            <div class="form-help">可以直接粘贴完整网址，会自动去掉 http(s):// 和 www.</div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" id="cancelAllowBtn">取消</button>
+          <button class="btn btn-primary" id="saveAllowBtn">保存</button>
+        </div>
+      </div>
+
+      <!-- 白名单列表 -->
+      <div class="sites-list" id="allowList">
+        <!-- 动态生成 -->
+      </div>
+    </div>
   </div>
 
   <script src="settings.js"></script>

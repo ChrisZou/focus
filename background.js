@@ -10,10 +10,70 @@ const defaultBlockedSites = [
 // 重定向目标URL
 const destinationUrl = chrome.runtime.getURL('redirect.html');
 
-// 允许访问的路径列表
-const allowList = [
+// 默认白名单规则（即使域名被屏蔽，也允许访问）
+// 规则支持两种写法：
+//   1. 纯域名，如 creator.xiaohongshu.com（匹配该域名及其子域名）
+//   2. 域名+路径前缀，如 space.bilibili.com/12345（匹配该路径及其下所有页面）
+const defaultAllowList = [
   "creator.xiaohongshu.com",
 ];
+
+// 获取用户配置的白名单
+async function getAllowList() {
+  const data = await chrome.storage.local.get(['allowList']);
+  return Array.isArray(data.allowList) ? data.allowList : defaultAllowList;
+}
+
+// 初始化默认白名单
+async function initializeAllowList() {
+  const data = await chrome.storage.local.get(['allowList']);
+  if (!Array.isArray(data.allowList)) {
+    await chrome.storage.local.set({ allowList: defaultAllowList });
+  }
+}
+
+// 规范化白名单规则：去掉协议、www.、末尾斜杠，统一小写
+function normalizeAllowRule(rule) {
+  let r = String(rule || '').trim().toLowerCase();
+  r = r.replace(/^https?:\/\//, '');
+  r = r.replace(/^www\./, '');
+  r = r.split(/[?#]/)[0];
+  r = r.replace(/\/+$/, '');
+  return r;
+}
+
+// 判断 hostname 是否等于 domain 或是其子域名
+function hostMatches(hostname, domain) {
+  return hostname === domain || hostname.endsWith('.' + domain);
+}
+
+// 判断 URL 是否命中某条白名单规则
+function matchesAllowRule(urlObj, rule) {
+  const normalized = normalizeAllowRule(rule);
+  if (!normalized) return false;
+  const slashIndex = normalized.indexOf('/');
+  const ruleHost = slashIndex === -1 ? normalized : normalized.slice(0, slashIndex);
+  const rulePath = slashIndex === -1 ? '' : normalized.slice(slashIndex);
+
+  const hostname = urlObj.hostname.toLowerCase().replace(/^www\./, '');
+  if (!hostMatches(hostname, ruleHost)) return false;
+  if (!rulePath) return true;
+
+  const path = urlObj.pathname.replace(/\/+$/, '') || '/';
+  return path === rulePath || path.startsWith(rulePath + '/');
+}
+
+// 判断 URL 是否在白名单中
+async function isUrlAllowed(url) {
+  let urlObj;
+  try {
+    urlObj = new URL(url);
+  } catch (e) {
+    return false;
+  }
+  const allowList = await getAllowList();
+  return allowList.some(rule => matchesAllowRule(urlObj, rule));
+}
 
 // 获取用户配置的屏蔽网站列表
 async function getBlockedSites() {
@@ -157,15 +217,14 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   // 获取域名
   const domain = extractDomain(details.url);
 
-  // 检查是否在允许列表中
-  const isAllowed = allowList.some(allowedPath => domain === allowedPath);
-  if (isAllowed) return;
+  // 检查是否在白名单中
+  if (await isUrlAllowed(details.url)) return;
 
   // 获取用户配置的屏蔽网站列表
   const blockedSites = await getBlockedSites();
 
-  // 检查是否需要阻止
-  const blockedSite = blockedSites.find(site => domain === site.domain);
+  // 检查是否需要阻止（匹配域名本身及其所有子域名）
+  const blockedSite = blockedSites.find(site => hostMatches(domain, site.domain));
   if (blockedSite) {
     // 更新访问统计
     const stats = await updateVisitStats(blockedSite);
@@ -188,6 +247,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   await getUserId();
   // 初始化默认屏蔽网站列表
   await initializeBlockedSites();
+  // 初始化默认白名单
+  await initializeAllowList();
 });
 
 // 监听来自扩展popup的消息
@@ -236,6 +297,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const filteredSites = sites.filter(site => site.domain !== domain);
         await chrome.storage.local.set({ blockedSites: filteredSites });
         sendResponse({ success: true, sites: filteredSites });
+      })
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'getAllowList') {
+    getAllowList()
+      .then(rules => sendResponse({ success: true, rules }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'addAllowRule') {
+    const rule = normalizeAllowRule(request.rule);
+    getAllowList()
+      .then(async rules => {
+        if (!rule) {
+          sendResponse({ success: false, error: '规则不能为空' });
+          return;
+        }
+        if (rules.includes(rule)) {
+          sendResponse({ success: false, error: '该规则已在白名单中' });
+          return;
+        }
+        rules.push(rule);
+        await chrome.storage.local.set({ allowList: rules });
+        sendResponse({ success: true, rules });
+      })
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'removeAllowRule') {
+    const { rule } = request;
+    getAllowList()
+      .then(async rules => {
+        const filtered = rules.filter(r => r !== rule);
+        await chrome.storage.local.set({ allowList: filtered });
+        sendResponse({ success: true, rules: filtered });
       })
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;

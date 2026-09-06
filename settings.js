@@ -9,6 +9,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const nameInput = document.getElementById('nameInput');
   const timeInput = document.getElementById('timeInput');
 
+  // 白名单元素
+  const addAllowBtn = document.getElementById('addAllowBtn');
+  const addAllowForm = document.getElementById('addAllowForm');
+  const cancelAllowBtn = document.getElementById('cancelAllowBtn');
+  const saveAllowBtn = document.getElementById('saveAllowBtn');
+  const allowListEl = document.getElementById('allowList');
+  const allowRuleInput = document.getElementById('allowRuleInput');
+
   // 自定义提示语元素
   const customMessageInput = document.getElementById('customMessageInput');
   const messageSourceInput = document.getElementById('messageSourceInput');
@@ -21,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const totalSavedEl = document.getElementById('totalSaved');
 
   let currentBlockedSites = [];
+  let currentAllowList = [];
 
   // 初始化页面
   await loadData();
@@ -30,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await Promise.all([
         loadBlockedSites(),
+        loadAllowList(),
         loadStats(),
         loadCustomMessage()
       ]);
@@ -49,6 +59,118 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (error) {
       console.error('加载网站列表失败:', error);
+    }
+  }
+
+  // 加载白名单
+  async function loadAllowList() {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getAllowList' });
+      if (response.success) {
+        currentAllowList = response.rules;
+        renderAllowList();
+      }
+    } catch (error) {
+      console.error('加载白名单失败:', error);
+    }
+  }
+
+  // 渲染白名单列表
+  function renderAllowList() {
+    if (currentAllowList.length === 0) {
+      allowListEl.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🔓</div>
+          <div>还没有配置任何白名单规则</div>
+          <div style="margin-top: 8px; font-size: 12px;">点击上方按钮添加允许访问的子域名或页面</div>
+        </div>
+      `;
+      return;
+    }
+
+    allowListEl.innerHTML = '';
+    currentAllowList.forEach(rule => {
+      const item = document.createElement('div');
+      item.className = 'site-item';
+      const hasPath = rule.includes('/');
+      item.innerHTML = `
+        <div class="site-info">
+          <div class="site-name"></div>
+          <div class="site-details">
+            <div>${hasPath ? '匹配该路径及其下所有页面' : '匹配该域名及其子域名'}</div>
+          </div>
+        </div>
+        <div class="site-actions">
+          <button class="btn btn-small btn-danger">删除</button>
+        </div>
+      `;
+      item.querySelector('.site-name').textContent = rule;
+      item.querySelector('.btn-danger').addEventListener('click', () => removeAllowRule(rule));
+      allowListEl.appendChild(item);
+    });
+  }
+
+  // 显示/隐藏白名单表单
+  addAllowBtn.addEventListener('click', () => {
+    addAllowForm.classList.add('show');
+    addAllowBtn.style.display = 'none';
+    allowRuleInput.focus();
+  });
+
+  cancelAllowBtn.addEventListener('click', () => hideAllowForm());
+
+  function hideAllowForm() {
+    addAllowForm.classList.remove('show');
+    addAllowBtn.style.display = 'block';
+    allowRuleInput.value = '';
+  }
+
+  // 保存白名单规则
+  saveAllowBtn.addEventListener('click', async () => {
+    const rule = allowRuleInput.value.trim();
+    if (!rule) {
+      showMessage('请输入域名或域名+路径', 'error');
+      return;
+    }
+
+    const hostPart = rule.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0];
+    if (!isValidDomain(hostPart)) {
+      showMessage('请输入有效的域名，例如: space.bilibili.com/12345', 'error');
+      return;
+    }
+
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'addAllowRule', rule });
+      if (response.success) {
+        currentAllowList = response.rules;
+        renderAllowList();
+        hideAllowForm();
+        showMessage('白名单规则添加成功！', 'success');
+      } else {
+        showMessage(response.error || '添加失败', 'error');
+      }
+    } catch (error) {
+      console.error('添加白名单失败:', error);
+      showMessage('添加失败', 'error');
+    }
+  });
+
+  // 删除白名单规则
+  async function removeAllowRule(rule) {
+    if (!confirm(`确定要删除白名单规则"${rule}"吗？`)) return;
+
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'removeAllowRule', rule });
+      if (response.success) {
+        currentAllowList = response.rules;
+        renderAllowList();
+        showMessage('白名单规则删除成功！', 'success');
+      } else {
+        showMessage('删除失败', 'error');
+      }
+    } catch (error) {
+      console.error('删除白名单失败:', error);
+      showMessage('删除失败', 'error');
     }
   }
 
@@ -314,6 +436,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Esc键取消添加
     if (e.key === 'Escape' && addForm.classList.contains('show')) {
       hideAddForm();
+    }
+    if (e.key === 'Escape' && addAllowForm.classList.contains('show')) {
+      hideAllowForm();
+    }
+    // 白名单输入框中的Enter键保存
+    if (e.key === 'Enter' && document.activeElement === allowRuleInput) {
+      saveAllowBtn.click();
     }
     // Enter键保存（当焦点在表单中时）
     if (e.key === 'Enter' && addForm.classList.contains('show')) {
