@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const todayCountElement = document.getElementById('todayCount');
   const settingsBtn = document.getElementById('settingsBtn');
 
+  // 显示版本号
+  document.getElementById('version').textContent = 'v' + chrome.runtime.getManifest().version;
+
   // 获取今日统计
   const today = new Date().toISOString().split('T')[0];
   const data = await chrome.storage.local.get(['visitStats']);

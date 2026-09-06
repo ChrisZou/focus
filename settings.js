@@ -31,6 +31,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentBlockedSites = [];
   let currentAllowList = [];
 
+  // 显示版本号
+  document.getElementById('version').textContent = 'v' + chrome.runtime.getManifest().version;
+
   // 初始化页面
   await loadData();
 
