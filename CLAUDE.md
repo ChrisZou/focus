@@ -44,6 +44,10 @@ The extension consists of several key JavaScript files:
   - View statistics (total sites, blocked visits, time saved)
   - Manage blocked sites list with domain validation
 
+- **confirm.js/confirm.html**: Interstitial for daily-limited sites
+  - Shows remaining visits today and a 确认进入 button
+  - Sends `confirmVisit` to background.js, which re-checks the limit, counts, and navigates to the target
+
 - **redirect.js/redirect.html**: The focus page users see when redirected
   - Displays custom focus message
   - Shows statistics about blocked visits and time saved
@@ -78,7 +82,7 @@ Stored in `chrome.storage.local` under `allowList` (array of strings), managed f
 
 ### Daily Visit Limit (每日访问限额)
 
-A blocked site with `dailyLimit` (positive integer) allows the first N visits per local calendar day, then blocks as usual. A visit = entering the site in a tab (navigations within the site in the same tab don't count again; leaving and coming back does). Whitelisted URLs are not counted. Set in the settings page (add form or "设置限额" button); popup shows remaining visits.
+A blocked site with `dailyLimit` (positive integer) allows the first N visits per local calendar day, then blocks as usual. Each new visit first goes to `confirm.html` (shows 今天还剩 N 次 + 确认进入); only clicking confirm (`confirmVisit` message) counts the visit, writes `tabVisits` for that tab (which also acts as the pass so the follow-up navigation isn't intercepted again) and navigates to the original URL. At 0 remaining the redirect page is shown directly. A visit = entering the site in a tab (navigations within the site in the same tab don't count again; leaving and coming back does). Whitelisted URLs are not counted. Set in the settings page (add form or "设置限额" button); popup shows remaining visits.
 
 Blocked sites match the domain and all subdomains (e.g. `bilibili.com` also blocks `space.bilibili.com`); allow list is checked first.
 

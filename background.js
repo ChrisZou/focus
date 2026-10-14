@@ -10,6 +10,9 @@ const defaultBlockedSites = [
 // 重定向目标URL
 const destinationUrl = chrome.runtime.getURL('redirect.html');
 
+// 每日限额网站的访问确认页
+const confirmPageUrl = chrome.runtime.getURL('confirm.html');
+
 // 默认白名单规则（即使域名被屏蔽，也允许访问）
 // 规则支持两种写法：
 //   1. 纯域名，如 creator.xiaohongshu.com（匹配该域名及其子域名）
@@ -280,7 +283,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     return;
   }
 
-  // 若配置了每日访问限额：未达限额则放行并计数，达限额后按原逻辑屏蔽
+  // 若配置了每日访问限额：未达限额先显示确认页（确认后才计数放行），达限额后按原逻辑屏蔽
   if (hasDailyLimit(blockedSite)) {
     // 同一标签页内在该网站内部跳转/刷新，不重复计数（同一天内）
     const session = await chrome.storage.session.get(['tabVisits']);
@@ -289,11 +292,16 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     const sessionKey = getTodayString() + '|' + blockedSite.domain;
     if (tabVisits[tabKey] === sessionKey) return;
 
+    // 未达限额：先跳转到确认页，用户点击“确认进入”后才计数并放行
     const used = await getDailyVisitCount(blockedSite.domain);
     if (used < blockedSite.dailyLimit) {
-      await incrementDailyVisitCount(blockedSite.domain);
-      tabVisits[tabKey] = sessionKey;
-      await chrome.storage.session.set({ tabVisits });
+      const confirmUrl = new URL(confirmPageUrl);
+      confirmUrl.searchParams.set('site', blockedSite.name);
+      confirmUrl.searchParams.set('domain', blockedSite.domain);
+      confirmUrl.searchParams.set('target', details.url);
+      confirmUrl.searchParams.set('dailyLimit', String(blockedSite.dailyLimit));
+      confirmUrl.searchParams.set('dailyUsed', String(used));
+      chrome.tabs.update(details.tabId, { url: confirmUrl.toString() });
       return;
     }
   }
@@ -429,6 +437,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         await chrome.storage.local.set({ blockedSites: sites });
         sendResponse({ success: true, sites });
       })
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'confirmVisit') {
+    // 确认页点击“确认进入”：重新校验限额，计数并标记该标签页的本次访问，然后放行
+    const tabId = sender.tab && sender.tab.id;
+    const { domain, target } = request;
+    (async () => {
+      if (tabId === undefined) throw new Error('无法识别标签页');
+      let targetUrl;
+      try {
+        targetUrl = new URL(target);
+      } catch (e) {
+        throw new Error('目标地址无效');
+      }
+      if (!/^https?:$/.test(targetUrl.protocol)) throw new Error('目标地址无效');
+      const sites = await getBlockedSites();
+      const site = sites.find(s => s.domain === domain);
+      if (!site || !hasDailyLimit(site) || !hostMatches(extractDomain(target), site.domain)) {
+        // 限额已被移除或配置变更：直接前往，由导航监听按当前配置处理
+        chrome.tabs.update(tabId, { url: target });
+        return { success: true };
+      }
+      const used = await getDailyVisitCount(site.domain);
+      if (used >= site.dailyLimit) {
+        return { success: false, exhausted: true, error: '今天的访问次数已用完' };
+      }
+      await incrementDailyVisitCount(site.domain);
+      // 标记为本次访问（同时作为放行凭证），之后同标签页内的站内跳转不再提示
+      const session = await chrome.storage.session.get(['tabVisits']);
+      const tabVisits = session.tabVisits || {};
+      tabVisits[String(tabId)] = getTodayString() + '|' + site.domain;
+      await chrome.storage.session.set({ tabVisits });
+      chrome.tabs.update(tabId, { url: target });
+      return { success: true };
+    })()
+      .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   } else if (request.action === 'getDailyVisitInfo') {
