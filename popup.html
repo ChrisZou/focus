@@ -83,6 +83,37 @@
       font-size: 14px;
     }
 
+    .daily-limits {
+      display: none;
+      background: #f8f9fa;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #34495e;
+    }
+
+    .limits-title {
+      color: #7f8c8d;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .limit-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+
+    .limit-value {
+      font-weight: bold;
+      color: #27ae60;
+    }
+
+    .limit-value.exhausted {
+      color: #e74c3c;
+    }
+
     .settings-btn {
       background: #34495e;
       margin-top: 12px;
@@ -106,6 +137,8 @@
       <div class="number" id="todayCount">0</div>
       <div>次干扰</div>
     </div>
+
+    <div class="daily-limits" id="dailyLimits"></div>
 
     <button id="disable1MinButton">暂停阻止 1 分钟</button>
     <button id="disable5MinButton">暂停阻止 5 分钟</button>

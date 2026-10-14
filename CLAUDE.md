@@ -52,7 +52,9 @@ The extension consists of several key JavaScript files:
 ### Data Storage
 
 Uses Chrome's `chrome.storage.local` API to persist:
-- `blockedSites`: Array of blocked site objects with {domain, name, avgTime}
+- `blockedSites`: Array of blocked site objects with {domain, name, avgTime, dailyLimit?}
+- `dailyVisitCounts`: `{ 'YYYY-MM-DD': { domain: count } }` allowed visits under the daily limit (local date; only today is kept)
+- `tabVisits` (chrome.storage.session): tabId -> 'date|domain', so in-site navigation in the same tab counts as one visit
 - `allowList`: Array of allow rule strings (domain or domain/path prefix)
 - `visitStats`: Daily statistics by date and domain
 - `totalSavedTime`: Cumulative time saved in minutes
@@ -73,6 +75,10 @@ The extension comes with pre-configured blocked sites:
 Stored in `chrome.storage.local` under `allowList` (array of strings), managed from the settings page. Default: `creator.xiaohongshu.com`. Rules take two forms:
 - Domain only (e.g. `creator.xiaohongshu.com`): matches that host and all its subdomains
 - Domain + path prefix (e.g. `space.bilibili.com/12345`): matches that path and everything under it
+
+### Daily Visit Limit (每日访问限额)
+
+A blocked site with `dailyLimit` (positive integer) allows the first N visits per local calendar day, then blocks as usual. A visit = entering the site in a tab (navigations within the site in the same tab don't count again; leaving and coming back does). Whitelisted URLs are not counted. Set in the settings page (add form or "设置限额" button); popup shows remaining visits.
 
 Blocked sites match the domain and all subdomains (e.g. `bilibili.com` also blocks `space.bilibili.com`); allow list is checked first.
 

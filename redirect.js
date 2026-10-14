@@ -34,6 +34,14 @@ function updateStats() {
   document.getElementById('todayCount').textContent = count;
   document.getElementById('savedTime').textContent = (savedTime / 60).toFixed(1);
   document.getElementById('siteName').textContent = site;
+
+  // 若因达到每日访问限额而被拦截，显示提示
+  const dailyLimit = parseInt(params.get('dailyLimit')) || 0;
+  if (dailyLimit > 0) {
+    const notice = document.getElementById('limitNotice');
+    notice.textContent = `今日 ${site} 的 ${dailyLimit} 次访问额度已用完，明天再来吧`;
+    notice.style.display = 'block';
+  }
 }
 
 // 页面加载完成后执行

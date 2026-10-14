@@ -120,10 +120,60 @@ async function getUserId() {
   return newUserId;
 }
 
-// 获取今天的日期字符串 (YYYY-MM-DD)
+// 获取今天的日期字符串 (YYYY-MM-DD，本地时区)
 function getTodayString() {
   const today = new Date();
-  return today.toISOString().split('T')[0];
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// 获取某个网站今日已访问次数（仅计入限额内的允许访问）
+async function getDailyVisitCount(domain) {
+  const today = getTodayString();
+  const data = await chrome.storage.local.get(['dailyVisitCounts']);
+  const counts = data.dailyVisitCounts || {};
+  if (!counts[today] || typeof counts[today][domain] !== 'number') {
+    return 0;
+  }
+  return counts[today][domain];
+}
+
+// 增加今日访问计数（到达限额前的允许访问）
+async function incrementDailyVisitCount(domain) {
+  const today = getTodayString();
+  const data = await chrome.storage.local.get(['dailyVisitCounts']);
+  const counts = data.dailyVisitCounts || {};
+  if (!counts[today]) {
+    counts[today] = {};
+  }
+  counts[today][domain] = (counts[today][domain] || 0) + 1;
+  // 清理过期日期，只保留今天
+  const pruned = { [today]: counts[today] };
+  await chrome.storage.local.set({ dailyVisitCounts: pruned });
+  return counts[today][domain];
+}
+
+// 标签页离开限额网站后清除记录，再次进入时计为一次新访问
+async function clearTabVisit(tabId) {
+  const session = await chrome.storage.session.get(['tabVisits']);
+  const tabVisits = session.tabVisits || {};
+  const tabKey = String(tabId);
+  if (tabKey in tabVisits) {
+    delete tabVisits[tabKey];
+    await chrome.storage.session.set({ tabVisits });
+  }
+}
+
+// 标签页关闭时清除记录
+chrome.tabs.onRemoved.addListener((tabId) => {
+  clearTabVisit(tabId);
+});
+
+// 判断网站是否配置了每日访问限额（正整数）
+function hasDailyLimit(site) {
+  return Number.isInteger(site.dailyLimit) && site.dailyLimit > 0;
 }
 
 // 更新访问统计
@@ -225,20 +275,45 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
   // 检查是否需要阻止（匹配域名本身及其所有子域名）
   const blockedSite = blockedSites.find(site => hostMatches(domain, site.domain));
-  if (blockedSite) {
-    // 更新访问统计
-    const stats = await updateVisitStats(blockedSite);
-
-    // 构建重定向URL，包含统计信息
-    const redirectUrl = new URL(destinationUrl);
-    redirectUrl.searchParams.set('site', blockedSite.name);
-    redirectUrl.searchParams.set('count', stats.todayCount);
-    redirectUrl.searchParams.set('savedTime', stats.totalSavedMinutes);
-    redirectUrl.searchParams.set('avgTime', blockedSite.avgTime);
-
-    // 取消当前导航并重定向到目标URL
-    chrome.tabs.update(details.tabId, { url: redirectUrl.toString() });
+  if (!blockedSite) {
+    await clearTabVisit(details.tabId);
+    return;
   }
+
+  // 若配置了每日访问限额：未达限额则放行并计数，达限额后按原逻辑屏蔽
+  if (hasDailyLimit(blockedSite)) {
+    // 同一标签页内在该网站内部跳转/刷新，不重复计数（同一天内）
+    const session = await chrome.storage.session.get(['tabVisits']);
+    const tabVisits = session.tabVisits || {};
+    const tabKey = String(details.tabId);
+    const sessionKey = getTodayString() + '|' + blockedSite.domain;
+    if (tabVisits[tabKey] === sessionKey) return;
+
+    const used = await getDailyVisitCount(blockedSite.domain);
+    if (used < blockedSite.dailyLimit) {
+      await incrementDailyVisitCount(blockedSite.domain);
+      tabVisits[tabKey] = sessionKey;
+      await chrome.storage.session.set({ tabVisits });
+      return;
+    }
+  }
+
+  // 更新访问统计（被拦截）
+  const stats = await updateVisitStats(blockedSite);
+
+  // 构建重定向URL，包含统计信息
+  const redirectUrl = new URL(destinationUrl);
+  redirectUrl.searchParams.set('site', blockedSite.name);
+  redirectUrl.searchParams.set('count', stats.todayCount);
+  redirectUrl.searchParams.set('savedTime', stats.totalSavedMinutes);
+  redirectUrl.searchParams.set('avgTime', blockedSite.avgTime);
+  if (hasDailyLimit(blockedSite)) {
+    redirectUrl.searchParams.set('dailyLimit', String(blockedSite.dailyLimit));
+    redirectUrl.searchParams.set('dailyUsed', String(blockedSite.dailyLimit));
+  }
+
+  // 取消当前导航并重定向到目标URL
+  chrome.tabs.update(details.tabId, { url: redirectUrl.toString() });
 });
 
 // 监听扩展安装事件
@@ -275,7 +350,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   } else if (request.action === 'addBlockedSite') {
-    const { domain, name, avgTime } = request;
+    const { domain, name, avgTime, dailyLimit } = request;
     getBlockedSites()
       .then(async sites => {
         // 检查是否已存在
@@ -283,8 +358,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: '该网站已在屏蔽列表中' });
           return;
         }
-        // 添加新网站
-        sites.push({ domain, name, avgTime });
+        // 添加新网站（dailyLimit 为正整数时启用每日限额，否则始终屏蔽）
+        const site = { domain, name, avgTime };
+        if (Number.isInteger(dailyLimit) && dailyLimit > 0) {
+          site.dailyLimit = dailyLimit;
+        }
+        sites.push(site);
         await chrome.storage.local.set({ blockedSites: sites });
         sendResponse({ success: true, sites });
       })
@@ -334,7 +413,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   } else if (request.action === 'updateBlockedSite') {
-    const { domain, name, avgTime } = request;
+    const { domain, name, avgTime, dailyLimit } = request;
     getBlockedSites()
       .then(async sites => {
         const siteIndex = sites.findIndex(site => site.domain === domain);
@@ -342,9 +421,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: '找不到该网站' });
           return;
         }
-        sites[siteIndex] = { domain, name, avgTime };
+        const site = { domain, name, avgTime };
+        if (Number.isInteger(dailyLimit) && dailyLimit > 0) {
+          site.dailyLimit = dailyLimit;
+        }
+        sites[siteIndex] = site;
         await chrome.storage.local.set({ blockedSites: sites });
         sendResponse({ success: true, sites });
+      })
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'getDailyVisitInfo') {
+    // 返回各屏蔽网站的今日访问次数与限额信息
+    getBlockedSites()
+      .then(async sites => {
+        const today = getTodayString();
+        const data = await chrome.storage.local.get(['dailyVisitCounts']);
+        const counts = (data.dailyVisitCounts && data.dailyVisitCounts[today]) || {};
+        const info = sites.map(site => ({
+          domain: site.domain,
+          name: site.name,
+          dailyLimit: hasDailyLimit(site) ? site.dailyLimit : null,
+          used: counts[site.domain] || 0
+        }));
+        sendResponse({ success: true, today, info });
       })
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;

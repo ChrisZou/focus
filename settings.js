@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const domainInput = document.getElementById('domainInput');
   const nameInput = document.getElementById('nameInput');
   const timeInput = document.getElementById('timeInput');
+  const limitInput = document.getElementById('limitInput');
 
   // 白名单元素
   const addAllowBtn = document.getElementById('addAllowBtn');
@@ -30,6 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentBlockedSites = [];
   let currentAllowList = [];
+  let todayVisitCounts = {};
 
   // 显示版本号
   document.getElementById('version').textContent = 'v' + chrome.runtime.getManifest().version;
@@ -54,6 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 加载屏蔽网站列表
   async function loadBlockedSites() {
     try {
+      await loadDailyVisitCounts();
       const response = await chrome.runtime.sendMessage({ action: 'getBlockedSites' });
       if (response.success) {
         currentBlockedSites = response.sites;
@@ -63,6 +66,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       console.error('加载网站列表失败:', error);
     }
+  }
+
+  // 加载今日各网站访问次数（限额计数）
+  async function loadDailyVisitCounts() {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getDailyVisitInfo' });
+      todayVisitCounts = {};
+      if (response && response.success) {
+        response.info.forEach(item => { todayVisitCounts[item.domain] = item.used; });
+      }
+    } catch (error) {
+      console.error('加载今日访问次数失败:', error);
+    }
+  }
+
+  // 解析每日限额输入：正整数启用限额，否则为 null（始终屏蔽）
+  function parseDailyLimit(value) {
+    const n = parseInt(value, 10);
+    return Number.isInteger(n) && n > 0 ? n : null;
   }
 
   // 加载白名单
@@ -228,9 +250,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="site-details">
             <div class="site-domain">${site.domain}</div>
             <div>平均时长: ${site.avgTime}分钟</div>
+            <div>${site.dailyLimit ? `每日限额: ${site.dailyLimit}次（今日已访问 ${todayVisitCounts[site.domain] || 0} 次）` : '始终屏蔽'}</div>
           </div>
         </div>
         <div class="site-actions">
+          <button class="btn btn-small btn-primary btn-limit" data-domain="${site.domain}">设置限额</button>
           <button class="btn btn-small btn-danger" data-domain="${site.domain}">删除</button>
         </div>
       `;
@@ -244,6 +268,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         await removeSite(domain);
       });
     });
+
+    // 绑定设置限额按钮事件
+    sitesList.querySelectorAll('.btn-limit').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const domain = e.target.getAttribute('data-domain');
+        await editDailyLimit(domain);
+      });
+    });
+  }
+
+  // 编辑每日访问限额
+  async function editDailyLimit(domain) {
+    const site = currentBlockedSites.find(s => s.domain === domain);
+    if (!site) return;
+    const input = prompt(`设置"${site.name}"每日允许访问次数（留空或0表示始终屏蔽）：`, site.dailyLimit || '');
+    if (input === null) return;
+    const trimmed = input.trim();
+    if (trimmed && !/^\d+$/.test(trimmed)) {
+      showMessage('请输入非负整数', 'error');
+      return;
+    }
+    const dailyLimit = parseDailyLimit(trimmed);
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'updateBlockedSite',
+        domain: site.domain,
+        name: site.name,
+        avgTime: site.avgTime,
+        dailyLimit
+      });
+      if (response.success) {
+        currentBlockedSites = response.sites;
+        await loadDailyVisitCounts();
+        renderSitesList();
+        showMessage(dailyLimit ? `已设置每日限额 ${dailyLimit} 次` : '已改为始终屏蔽', 'success');
+      } else {
+        showMessage(response.error || '保存失败', 'error');
+      }
+    } catch (error) {
+      console.error('设置限额失败:', error);
+      showMessage('保存失败', 'error');
+    }
   }
 
   // 显示添加表单
@@ -270,6 +337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     domainInput.value = '';
     nameInput.value = '';
     timeInput.value = '';
+    limitInput.value = '';
   }
 
   // 保存新网站
@@ -277,6 +345,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const domain = domainInput.value.trim();
     const name = nameInput.value.trim();
     const avgTime = parseInt(timeInput.value) || 30;
+    const dailyLimit = parseDailyLimit(limitInput.value);
 
     if (!domain || !name) {
       showMessage('请填写完整信息', 'error');
@@ -294,7 +363,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         action: 'addBlockedSite',
         domain: domain.toLowerCase(),
         name,
-        avgTime
+        avgTime,
+        dailyLimit
       });
 
       if (response.success) {
