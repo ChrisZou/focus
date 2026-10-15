@@ -25,18 +25,5 @@
       "128": "icons/icon128.png"
     }
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "redirect.html",
-        "redirect.js",
-        "confirm.html",
-        "confirm.js"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ],
   "options_page": "settings.html"
 }
