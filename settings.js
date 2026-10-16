@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sitesList = document.getElementById('sitesList');
   const domainInput = document.getElementById('domainInput');
   const nameInput = document.getElementById('nameInput');
-  const timeInput = document.getElementById('timeInput');
   const limitInput = document.getElementById('limitInput');
 
   // 白名单元素
@@ -27,7 +26,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 统计元素
   const totalSitesEl = document.getElementById('totalSites');
   const totalBlockedEl = document.getElementById('totalBlocked');
-  const totalSavedEl = document.getElementById('totalSaved');
 
   let currentBlockedSites = [];
   let currentAllowList = [];
@@ -83,8 +81,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 解析每日限额输入：正整数启用限额，否则为 null（始终屏蔽）
   function parseDailyLimit(value) {
-    const n = parseInt(value, 10);
-    return Number.isInteger(n) && n > 0 ? n : null;
+    const trimmed = value.trim();
+    if (trimmed && (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(Number(trimmed)))) {
+      return undefined;
+    }
+    return Number(trimmed) > 0 ? Number(trimmed) : null;
   }
 
   // 加载白名单
@@ -102,51 +103,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 渲染白名单列表
   function renderAllowList() {
+    document.getElementById('allowSummary').textContent = `${currentAllowList.length} 条规则`;
+    allowListEl.replaceChildren();
     if (currentAllowList.length === 0) {
-      allowListEl.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">🔓</div>
-          <div>还没有配置任何白名单规则</div>
-          <div style="margin-top: 8px; font-size: 12px;">点击上方按钮添加允许访问的子域名或页面</div>
-        </div>
-      `;
+      allowListEl.innerHTML = '<div class="empty"><b>还没有白名单规则</b><span>添加后，被屏蔽网站中的这些页面仍可访问</span></div>';
       return;
     }
-
-    allowListEl.innerHTML = '';
     currentAllowList.forEach(rule => {
       const item = document.createElement('div');
-      item.className = 'site-item';
-      const hasPath = rule.includes('/');
-      item.innerHTML = `
-        <div class="site-info">
-          <div class="site-name"></div>
-          <div class="site-details">
-            <div>${hasPath ? '匹配该路径及其下所有页面' : '匹配该域名及其子域名'}</div>
-          </div>
-        </div>
-        <div class="site-actions">
-          <button class="btn btn-small btn-danger">删除</button>
-        </div>
-      `;
-      item.querySelector('.site-name').textContent = rule;
-      item.querySelector('.btn-danger').addEventListener('click', () => removeAllowRule(rule));
+      item.className = 'rule';
+      item.innerHTML = '<div class="n"></div><div class="k"></div><button class="lk del">删除</button>';
+      item.querySelector('.n').textContent = rule;
+      item.querySelector('.k').textContent = rule.includes('/') ? '域名 + 路径前缀' : '纯域名';
+      item.querySelector('.del').addEventListener('click', () => removeAllowRule(rule));
       allowListEl.appendChild(item);
     });
   }
 
   // 显示/隐藏白名单表单
   addAllowBtn.addEventListener('click', () => {
-    addAllowForm.classList.add('show');
-    addAllowBtn.style.display = 'none';
+    addAllowForm.hidden = false;
+    addAllowBtn.disabled = true;
     allowRuleInput.focus();
   });
 
   cancelAllowBtn.addEventListener('click', () => hideAllowForm());
 
   function hideAllowForm() {
-    addAllowForm.classList.remove('show');
-    addAllowBtn.style.display = 'block';
+    addAllowForm.hidden = true;
+    addAllowBtn.disabled = false;
     allowRuleInput.value = '';
   }
 
@@ -202,9 +187,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 加载统计数据
   async function loadStats() {
     try {
-      const data = await chrome.storage.local.get(['visitStats', 'totalSavedTime']);
+      const data = await chrome.storage.local.get(['visitStats']);
       const stats = data.visitStats || {};
-      const totalSavedTime = data.totalSavedTime || 0;
 
       // 计算总拦截次数
       let totalBlocked = 0;
@@ -215,8 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       // 更新统计显示
-      totalBlockedEl.textContent = totalBlocked;
-      totalSavedEl.textContent = (totalSavedTime / 60).toFixed(1);
+      totalBlockedEl.textContent = totalBlocked.toLocaleString();
     } catch (error) {
       console.error('加载统计数据失败:', error);
     }
@@ -229,94 +212,109 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 渲染网站列表
   function renderSitesList() {
+    const alwaysBlocked = currentBlockedSites.filter(site => !site.dailyLimit).length;
+    document.getElementById('sitesSummary').textContent = `${currentBlockedSites.length} 个网站` +
+      (alwaysBlocked ? ` · ${alwaysBlocked} 个始终屏蔽` : '');
+    sitesList.replaceChildren();
     if (currentBlockedSites.length === 0) {
-      sitesList.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">🌟</div>
-          <div>还没有配置任何屏蔽网站</div>
-          <div style="margin-top: 8px; font-size: 12px;">点击上方按钮添加你想要屏蔽的网站</div>
-        </div>
-      `;
+      sitesList.innerHTML = '<div class="empty"><b>还没有配置任何屏蔽网站</b><span>点击上方按钮添加你想要屏蔽的网站</span></div>';
       return;
     }
-
-    sitesList.innerHTML = '';
-    currentBlockedSites.forEach(site => {
-      const siteItem = document.createElement('div');
-      siteItem.className = 'site-item';
-      siteItem.innerHTML = `
-        <div class="site-info">
-          <div class="site-name">${site.name}</div>
-          <div class="site-details">
-            <div class="site-domain">${site.domain}</div>
-            <div>平均时长: ${site.avgTime}分钟</div>
-            <div>${site.dailyLimit ? `每日限额: ${site.dailyLimit}次（今日已访问 ${todayVisitCounts[site.domain] || 0} 次）` : '始终屏蔽'}</div>
-          </div>
-        </div>
-        <div class="site-actions">
-          <button class="btn btn-small btn-primary btn-limit" data-domain="${site.domain}">设置限额</button>
-          <button class="btn btn-small btn-danger" data-domain="${site.domain}">删除</button>
-        </div>
-      `;
-      sitesList.appendChild(siteItem);
-    });
-
-    // 绑定删除按钮事件
-    sitesList.querySelectorAll('.btn-danger').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const domain = e.target.getAttribute('data-domain');
-        await removeSite(domain);
-      });
-    });
-
-    // 绑定设置限额按钮事件
-    sitesList.querySelectorAll('.btn-limit').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const domain = e.target.getAttribute('data-domain');
-        await editDailyLimit(domain);
-      });
+    currentBlockedSites.forEach((site, index) => {
+      const row = document.createElement('div');
+      row.className = 'site';
+      row.innerHTML = '<div><div class="n"></div><div class="d"></div></div><div class="l"></div><div class="act"><button class="lk limit">修改限额</button><button class="lk del">删除</button></div>';
+      row.querySelector('.n').textContent = site.name;
+      row.querySelector('.d').textContent = site.domain;
+      const limit = row.querySelector('.l');
+      if (site.dailyLimit) {
+        const used = todayVisitCounts[site.domain] || 0;
+        const exhausted = used >= site.dailyLimit;
+        const count = document.createElement('b');
+        count.textContent = used;
+        count.classList.toggle('x', exhausted);
+        limit.append(count, ` / ${site.dailyLimit} 次 · 今日已访问`);
+        const meter = document.createElement('div');
+        meter.className = 'meter';
+        const fill = document.createElement('i');
+        fill.classList.toggle('x', exhausted);
+        fill.style.width = `${Math.min(100, used / site.dailyLimit * 100)}%`;
+        meter.appendChild(fill);
+        limit.appendChild(meter);
+      } else {
+        limit.innerHTML = '<b>始终屏蔽</b>';
+      }
+      row.querySelector('.del').addEventListener('click', () => removeSite(site.domain));
+      row.querySelector('.limit').addEventListener('click', () => editDailyLimit(site, row, index));
+      sitesList.appendChild(row);
     });
   }
 
-  // 编辑每日访问限额
-  async function editDailyLimit(domain) {
-    const site = currentBlockedSites.find(s => s.domain === domain);
-    if (!site) return;
-    const input = prompt(`设置"${site.name}"每日允许访问次数（留空或0表示始终屏蔽）：`, site.dailyLimit || '');
-    if (input === null) return;
-    const trimmed = input.trim();
-    if (trimmed && !/^\d+$/.test(trimmed)) {
-      showMessage('请输入非负整数', 'error');
-      return;
-    }
-    const dailyLimit = parseDailyLimit(trimmed);
-
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'updateBlockedSite',
-        domain: site.domain,
-        name: site.name,
-        avgTime: site.avgTime,
-        dailyLimit
-      });
-      if (response.success) {
+  // 在当前行内编辑限额，保留其他行的状态。
+  function editDailyLimit(site, row, index) {
+    const limit = row.querySelector('.l');
+    const actions = row.querySelector('.act');
+    const editor = document.createElement('div');
+    editor.className = 'edit';
+    editor.innerHTML = `<div><label for="editLimit${index}">每日允许次数</label><input id="editLimit${index}" type="number" min="0" step="1" inputmode="numeric"></div><button class="b">确定</button><button class="lk">取消</button>`;
+    const input = editor.querySelector('input');
+    const save = editor.querySelector('.b');
+    const cancel = editor.querySelector('.lk');
+    input.value = site.dailyLimit || '';
+    limit.hidden = true;
+    actions.replaceChildren();
+    // 编辑器位于中间列，操作列保持留空。
+    row.insertBefore(editor, actions);
+    const restore = () => {
+      editor.remove();
+      limit.hidden = false;
+      actions.innerHTML = '<button class="lk limit">修改限额</button><button class="lk del">删除</button>';
+      actions.querySelector('.limit').addEventListener('click', () => editDailyLimit(site, row, index));
+      actions.querySelector('.del').addEventListener('click', () => removeSite(site.domain));
+      actions.querySelector('.limit').focus();
+    };
+    cancel.addEventListener('click', restore);
+    save.addEventListener('click', async () => {
+      const dailyLimit = parseDailyLimit(input.value);
+      if (input.validity.badInput || dailyLimit === undefined) {
+        showMessage('限额需为 0 或正整数，请重新输入', 'error');
+        input.focus();
+        return;
+      }
+      save.disabled = true;
+      cancel.disabled = true;
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: 'updateBlockedSite', domain: site.domain, name: site.name, dailyLimit
+        });
+        if (!response.success) throw new Error(response.error || '保存失败');
         currentBlockedSites = response.sites;
         await loadDailyVisitCounts();
         renderSitesList();
+        sitesList.children[index]?.querySelector('.limit')?.focus();
         showMessage(dailyLimit ? `已设置每日限额 ${dailyLimit} 次` : '已改为始终屏蔽', 'success');
-      } else {
-        showMessage(response.error || '保存失败', 'error');
+      } catch (error) {
+        showMessage(error.message || '保存失败', 'error');
+        save.disabled = false;
+        cancel.disabled = false;
       }
-    } catch (error) {
-      console.error('设置限额失败:', error);
-      showMessage('保存失败', 'error');
-    }
+    });
+    editor.addEventListener('keydown', e => {
+      if (e.isComposing) return;
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        (e.key === 'Enter' ? save : cancel).click();
+      }
+    });
+    input.focus();
+    input.select();
   }
 
   // 显示添加表单
   addSiteBtn.addEventListener('click', () => {
-    addForm.classList.add('show');
-    addSiteBtn.style.display = 'none';
+    addForm.hidden = false;
+    addSiteBtn.disabled = true;
     domainInput.focus();
   });
 
@@ -327,8 +325,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 隐藏添加表单
   function hideAddForm() {
-    addForm.classList.remove('show');
-    addSiteBtn.style.display = 'block';
+    addForm.hidden = true;
+    addSiteBtn.disabled = false;
     clearForm();
   }
 
@@ -336,7 +334,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   function clearForm() {
     domainInput.value = '';
     nameInput.value = '';
-    timeInput.value = '';
     limitInput.value = '';
   }
 
@@ -344,8 +341,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   saveBtn.addEventListener('click', async () => {
     const domain = domainInput.value.trim();
     const name = nameInput.value.trim();
-    const avgTime = parseInt(timeInput.value) || 30;
     const dailyLimit = parseDailyLimit(limitInput.value);
+    if (limitInput.validity.badInput || dailyLimit === undefined) {
+      showMessage('限额需为 0 或正整数，请重新输入', 'error');
+      limitInput.focus();
+      return;
+    }
 
     if (!domain || !name) {
       showMessage('请填写完整信息', 'error');
@@ -363,7 +364,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         action: 'addBlockedSite',
         domain: domain.toLowerCase(),
         name,
-        avgTime,
         dailyLimit
       });
 
@@ -413,60 +413,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     return domainRegex.test(domain);
   }
 
-  // 显示消息提示
-  function showMessage(message, type = 'info') {
-    // 移除已存在的消息
-    const existingMessage = document.querySelector('.message');
-    if (existingMessage) {
-      existingMessage.remove();
-    }
-
-    // 创建新消息
-    const messageEl = document.createElement('div');
-    messageEl.className = `message message-${type}`;
-    messageEl.textContent = message;
-    messageEl.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      border-radius: 6px;
-      color: white;
-      font-weight: 500;
-      z-index: 1000;
-      animation: slideIn 0.3s ease-out;
-      background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-    `;
-
-    // 添加CSS动画
-    if (!document.querySelector('#message-styles')) {
-      const styles = document.createElement('style');
-      styles.id = 'message-styles';
-      styles.textContent = `
-        @keyframes slideIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(100%); opacity: 0; }
-        }
-      `;
-      document.head.appendChild(styles);
-    }
-
-    document.body.appendChild(messageEl);
-
-    // 3秒后自动消失
-    setTimeout(() => {
-      messageEl.style.animation = 'slideOut 0.3s ease-out';
-      setTimeout(() => {
-        if (messageEl.parentNode) {
-          messageEl.parentNode.removeChild(messageEl);
-        }
-      }, 300);
-    }, 3000);
+  // 复用状态区域，让辅助技术可以读出新提示。
+  let toastTimer;
+  function showMessage(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    clearTimeout(toastTimer);
+    toast.classList.toggle('error', type === 'error');
+    toast.hidden = false;
+    document.getElementById('toastText').textContent = message;
+    toastTimer = setTimeout(() => { toast.hidden = true; }, 3000);
   }
+
+  function updateMessageCount() {
+    document.getElementById('messageCount').textContent = customMessageInput.value.length;
+  }
+  customMessageInput.addEventListener('input', updateMessageCount);
 
   // 加载自定义提示语
   async function loadCustomMessage() {
@@ -475,6 +436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       customMessageInput.value = data.customMessage || '保持专注';
       messageSourceInput.value = data.messageSource || '';
       messageAvatarInput.value = data.messageAvatar || '';
+      updateMessageCount();
     } catch (error) {
       console.error('加载自定义提示语失败:', error);
     }
@@ -506,11 +468,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 键盘快捷键支持
   document.addEventListener('keydown', (e) => {
+    if (e.isComposing) return;
     // Esc键取消添加
-    if (e.key === 'Escape' && addForm.classList.contains('show')) {
+    if (e.key === 'Escape' && !addForm.hidden) {
       hideAddForm();
     }
-    if (e.key === 'Escape' && addAllowForm.classList.contains('show')) {
+    if (e.key === 'Escape' && !addAllowForm.hidden) {
       hideAllowForm();
     }
     // 白名单输入框中的Enter键保存
@@ -518,8 +481,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveAllowBtn.click();
     }
     // Enter键保存（当焦点在表单中时）
-    if (e.key === 'Enter' && addForm.classList.contains('show')) {
-      if (document.activeElement.tagName === 'INPUT') {
+    if (e.key === 'Enter' && !addForm.hidden) {
+      if (addForm.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') {
         saveBtn.click();
       }
     }

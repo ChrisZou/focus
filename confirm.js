@@ -16,7 +16,7 @@ function normalize(s) {
 
 function render() {
   const remaining = Math.max(0, dailyLimit - dailyUsed);
-  document.getElementById('headline').textContent = `你确定、一定以及肯定，现在就要访问 ${siteLabel} 吗？`;
+  document.getElementById('headline').textContent = `你确定、一定以及肯定，现在就要访问${siteLabel}吗？`;
   document.getElementById('phrase').textContent = phrase;
   document.getElementById('remainingText').textContent = `${remaining} 次`;
   document.getElementById('usedText').textContent = `今天还剩 · 已用 ${dailyUsed} / ${dailyLimit}`;
@@ -34,7 +34,10 @@ function update() {
   if (!confirming) document.getElementById('confirmBtn').disabled = !ok;
   msg.classList.remove('warn');
   if (ok) msg.textContent = '输入一致，可以进入';
-  else if (typed && !want.startsWith(typed)) msg.textContent = '有字不对，请对照上面的句子';
+  else if (typed && !want.startsWith(typed)) {
+    msg.textContent = '有字不对，请对照上面的句子';
+    msg.classList.add('warn');
+  }
   else msg.textContent = '';
 }
 
@@ -66,6 +69,7 @@ function guardPhrase(el) {
 async function confirmVisit() {
   const btn = document.getElementById('confirmBtn');
   const errorEl = document.getElementById('errorText');
+  if (confirming || document.getElementById('confirmBtn').disabled) return;
   if (normalize(document.getElementById('phraseInput').value) !== normalize(phrase)) return;
   confirming = true;
   btn.disabled = true;

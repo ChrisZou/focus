@@ -5,15 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Focus - 确认访问</title>
+  <link rel="stylesheet" href="styles.css">
   <style>
-    :root {
-      --bg: #f1efe9;
-      --ink: #161513;
-      --muted: #5c5a54;
-      --accent: #d6411e;
-      --ok: #1f7a4a;
-    }
-
     html, body { height: 100%; }
 
     body {
@@ -90,7 +83,7 @@
     }
 
     .ok .msg { color: var(--ok); }
-    .msg.warn { color: var(--accent); }
+    .msg.warn { color: var(--accent-ink); }
 
     .count {
       text-align: right;
@@ -115,7 +108,7 @@
       padding: 1rem 2.5rem;
       border: 0;
       border-radius: 0;
-      background: var(--accent);
+      background: var(--btn);
       color: #fff;
       font: inherit;
       font-size: 1.125rem;
@@ -124,9 +117,9 @@
       transition: background-color 0.15s;
     }
 
-    button:hover:not(:disabled) { background: #b8361a; }
+    button:hover:not(:disabled) { background: var(--btn-h); }
     button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-    button:disabled { background: #d9d5cb; color: #8d897f; cursor: not-allowed; }
+    button:disabled { background: var(--rule); color: var(--disabled-ink); cursor: not-allowed; }
 
     .error {
       display: none;

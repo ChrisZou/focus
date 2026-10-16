@@ -1,118 +1,37 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Focus - 保持专注</title>
+  <link rel="stylesheet" href="styles.css">
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      margin: 0;
-      padding: 2rem;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: white;
-      color: #2c3e50;
-      line-height: 1.6;
-    }
+html,body{height:100%}
+body{min-height:100vh;padding:9rem 6rem 4.5rem;display:flex;flex-direction:column;justify-content:space-between;gap:3rem}
+.notice{font-size:1.5rem;font-weight:700;color:var(--accent-ink);margin:2rem 0 0}
+h1{margin:0;max-width:14em;font-size:4.25rem;font-weight:900;line-height:1.12;letter-spacing:-.03em;white-space:pre-wrap;overflow-wrap:anywhere;text-wrap:balance}
+.src{display:flex;align-items:center;gap:1rem;margin-top:2rem;font-size:1.25rem;color:var(--muted)}
+.src img{width:56px;height:56px;border-radius:50%;object-fit:cover}
+.src span::before{content:"— "}
+.low{display:grid;grid-template-columns:1fr auto;gap:3rem;align-items:end}
+.site{font-size:1.25rem;color:var(--muted)}.site b{color:var(--ink)}
+.st{grid-column:2;text-align:right}.st .num{display:block;font-size:6rem}.st small{display:block;margin-top:.6rem}.st small{font-size:1rem;color:var(--muted)}
 
-    h1 {
-      margin-bottom: 2.5rem;
-      color: #2c3e50;
-      font-size: 3rem;
-      max-width: 800px;
-      text-align: center;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
-
-    #sourceAvatar {
-      width: 108px;
-      height: 108px;
-      border-radius: 50%;
-      object-fit: cover;
-      margin-bottom: 1.5rem;
-      display: none;
-    }
-
-    .message-source {
-      display: none;
-      margin-bottom: 2rem;
-      color: #7f8c8d;
-      font-size: 1.1rem;
-    }
-
-    .message-source.show {
-      display: block;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 2rem;
-      margin: 2rem 0;
-      width: 100%;
-      max-width: 600px;
-    }
-
-    .stat-item {
-      background: #f8f9fa;
-      padding: 1.5rem;
-      border-radius: 15px;
-      text-align: center;
-    }
-
-    .number {
-      font-size: 2.5rem;
-      font-weight: bold;
-      color: #3498db;
-      margin-bottom: 0.5rem;
-    }
-
-    .label {
-      color: #7f8c8d;
-      font-size: 0.9rem;
-    }
-
-    .limit-notice {
-      display: none;
-      color: #e67e22;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .site {
-      color: #95a5a6;
-      font-size: 0.8rem;
-      margin-top: 0.5rem;
-    }
+main{display:contents}
   </style>
 </head>
-
 <body>
-  <img id="sourceAvatar" alt="">
-  <h1>保持专注</h1>
-  <div class="message-source" id="messageSource">
-    <span id="sourceName"></span>
-  </div>
-  <div class="limit-notice" id="limitNotice"></div>
-  <div class="stats">
-    <div class="stat-item">
-      <div class="number" id="todayCount">0</div>
-      <div class="label">今日已阻止访问次数</div>
-      <div class="site" id="siteName"></div>
+  <main>
+    <div>
+      <h1>保持专注</h1>
+      <div class="src" id="messageSource" hidden><img id="sourceAvatar" alt="来源头像" hidden><span id="sourceName" hidden></span></div>
+      <p class="notice" id="limitNotice" hidden></p>
     </div>
-    <div class="stat-item">
-      <div class="number" id="savedTime">0</div>
-      <div class="label">已节省时间（小时）</div>
+    <div class="low">
+      <div class="site" id="attemptedSite" hidden>你刚刚想打开 <b id="siteName"></b></div>
+      <div class="st"><span class="num" id="todayCount">0 次</span><small id="siteStats"></small></div>
     </div>
-  </div>
-
+  </main>
   <script src="redirect.js"></script>
 </body>
-
 </html>

@@ -1,435 +1,99 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Focus - 设置</title>
+  <link rel="stylesheet" href="styles.css">
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f8f9fa;
-      color: #2c3e50;
-    }
+body{padding:4.5rem 6rem 6rem}
+header{display:grid;grid-template-columns:1fr auto;align-items:end;gap:3rem;margin-bottom:5rem}
+h1{margin:0;font-size:4.25rem;font-weight:900;letter-spacing:-.03em;line-height:1.05}
+h1 small{font-size:1rem;font-weight:500;color:var(--faint);letter-spacing:0;margin-left:.6rem;vertical-align:.4em}
+header p{margin:.8rem 0 0;font-size:1.2rem;color:var(--muted)}
+.stats{display:flex;gap:5rem;text-align:right}.stats .num{font-size:4.25rem}.stats div div:last-child{font-size:.9rem;color:var(--muted);margin-top:.4rem}
+.stats .a .num{color:var(--accent)}
+section{display:grid;grid-template-columns:18rem minmax(0,1fr);gap:4rem;padding:3.5rem 0;border-top:3px solid var(--ink)}
+h2{margin:0;font-size:2rem;font-weight:900;letter-spacing:-.02em}
+.desc{margin:.9rem 0 0;font-size:.95rem;line-height:1.7;color:var(--muted)}
+.desc b{color:var(--ink)}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.bar .muted{font-size:.95rem}
+.form{padding:1.6rem 0 2rem;border-bottom:1px solid var(--rule);margin-bottom:.5rem}
+.form h3{margin:0 0 1.3rem;font-size:1.25rem;font-weight:900}
+.grid{display:grid;gap:2rem}.g4{grid-template-columns:1.2fr 1fr 12rem}.g2{grid-template-columns:1fr 1.6fr}
+.acts{display:flex;justify-content:flex-end;gap:.8rem;margin-top:1.6rem}
+.site{display:grid;grid-template-columns:minmax(0,1fr) 16rem 9rem;align-items:center;gap:1.5rem;padding:1.15rem 0;border-bottom:1px solid var(--rule)}
+.site .n{font-size:1.25rem;font-weight:800}.site .d{font-size:.9rem;color:var(--muted);margin-top:.15rem}
+.site .l{font-size:.95rem}.site .l b{font-size:1.25rem;font-weight:900}.site .l .x{color:var(--accent-ink)}
+.meter{height:4px;background:var(--rule);margin-top:.45rem}.meter i{display:block;height:100%;background:var(--ink)}.meter i.x{background:var(--accent)}
+.site .act{display:flex;gap:1.2rem;justify-content:flex-end}
+.edit{display:flex;white-space:nowrap;align-items:end;gap:.8rem}.edit input{width:3.5rem;font-size:1.25rem;font-weight:900}
+.rule{display:grid;grid-template-columns:1fr 10rem auto;gap:1.5rem;align-items:center;padding:1rem 0;border-bottom:1px solid var(--rule)}
+.rule .n{font-size:1.15rem;font-weight:700}.rule .k{font-size:.9rem;color:var(--muted)}
+.cnt{text-align:right;font-size:.85rem;color:var(--faint);margin-top:.4rem}
+.cnt b{color:var(--ink)}
+textarea{font-size:1.6rem;font-weight:800;line-height:1.35}
+.empty{padding:2.5rem 0;border-bottom:1px solid var(--rule)}.empty b{display:block;font-size:1.3rem}.empty span{color:var(--muted)}
+.toast{position:absolute;top:1rem;right:6rem;padding:.6rem 1.2rem;background:var(--ink);color:var(--bg);padding:.9rem 1.4rem;font-weight:700}
+.toast i{font-style:normal;display:inline-block;width:10px;height:10px;background:var(--ok);margin-right:.6rem}
+.ex{display:inline-block;font-size:.8rem;font-weight:700;color:var(--muted);margin-right:.4rem}
 
-    .header {
-      background: white;
-      padding: 20px;
-      border-bottom: 1px solid #e9ecef;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
+.source-fields{margin-top:2rem}
+.edit .b{padding:.55rem 1rem}
+input[type=number]{appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.toast{position:fixed;z-index:1000}.toast.error i{background:var(--accent)}
+.site .n,.site .d,.rule .n{overflow-wrap:anywhere}
 
-    .header h1 {
-      margin: 0;
-      color: #2c3e50;
-      font-size: 24px;
-    }
-
-    .header .version {
-      font-size: 13px;
-      font-weight: normal;
-      color: #95a5a6;
-      margin-left: 6px;
-    }
-
-    .header p {
-      margin: 8px 0 0 0;
-      color: #7f8c8d;
-      font-size: 14px;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-
-    .section {
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .section-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #2c3e50;
-      margin: 0 0 16px 0;
-    }
-
-    .section-description {
-      color: #7f8c8d;
-      font-size: 14px;
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-
-    .add-form {
-      background: #f8f9fa;
-      padding: 20px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      display: none;
-    }
-
-    .add-form.show {
-      display: block;
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 120px;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .form-group label {
-      font-size: 12px;
-      color: #7f8c8d;
-      margin-bottom: 6px;
-      font-weight: 500;
-    }
-
-    .form-group input {
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: border-color 0.3s;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: #3498db;
-    }
-
-    .form-help {
-      font-size: 11px;
-      color: #95a5a6;
-      margin-top: 8px;
-      line-height: 1.4;
-    }
-
-    .form-actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-      justify-content: flex-end;
-    }
-
-    .btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.3s;
-      font-weight: 500;
-    }
-
-    .btn-primary {
-      background: #3498db;
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: #2980b9;
-    }
-
-    .btn-secondary {
-      background: #95a5a6;
-      color: white;
-    }
-
-    .btn-secondary:hover {
-      background: #7f8c8d;
-    }
-
-    .btn-success {
-      background: #27ae60;
-      color: white;
-    }
-
-    .btn-success:hover {
-      background: #219a52;
-    }
-
-    .sites-list {
-      margin-top: 20px;
-    }
-
-    .site-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px;
-      margin-bottom: 8px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border: 1px solid #e9ecef;
-      transition: all 0.3s;
-    }
-
-    .site-item:hover {
-      background: #ecf0f1;
-      border-color: #bdc3c7;
-    }
-
-    .site-info {
-      flex: 1;
-    }
-
-    .site-name {
-      font-weight: 600;
-      color: #2c3e50;
-      font-size: 16px;
-      margin-bottom: 4px;
-    }
-
-    .site-details {
-      display: flex;
-      gap: 20px;
-      color: #7f8c8d;
-      font-size: 13px;
-    }
-
-    .site-domain {
-      font-family: monospace;
-      background: #e9ecef;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    .site-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .btn-small {
-      padding: 6px 12px;
-      font-size: 12px;
-    }
-
-    .btn-danger {
-      background: #e74c3c;
-      color: white;
-    }
-
-    .btn-danger:hover {
-      background: #c0392b;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: #7f8c8d;
-    }
-
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      opacity: 0.5;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .stat-card {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      text-align: center;
-      border: 1px solid #e9ecef;
-    }
-
-    .stat-number {
-      font-size: 32px;
-      font-weight: bold;
-      color: #3498db;
-      margin-bottom: 8px;
-    }
-
-    .stat-label {
-      color: #7f8c8d;
-      font-size: 14px;
-    }
-
-    /* 自定义提示语样式 - 简单的padding优化 */
-    .custom-message-actions {
-      padding-top: 8px;
-      margin-top: 8px;
-    }
-
-    #customMessageInput {
-      margin-bottom: 4px;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
-      font-family: inherit;
-      resize: vertical;
-      transition: border-color 0.3s;
-    }
-
-    #customMessageInput:focus {
-      outline: none;
-      border-color: #3498db;
-    }
-
-    .message-source-row {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 12px;
-      margin-top: 16px;
-    }
   </style>
 </head>
-
 <body>
-  <div class="header">
-    <h1>Focus 设置 <span class="version" id="version"></span></h1>
-    <p>管理你的专注助手配置</p>
-  </div>
-
-  <div class="container">
-    <!-- 统计信息 -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-number" id="totalSites">0</div>
-        <div class="stat-label">已配置网站</div>
+  <div class="toast" id="toast" role="status" hidden><i aria-hidden="true"></i><span id="toastText"></span></div>
+  <header>
+    <div><h1>Focus 设置<small id="version"></small></h1><p>管理你的专注助手配置</p></div>
+    <div class="stats"><div><div class="num" id="totalSites">0</div><div>已配置网站</div></div><div class="a"><div class="num" id="totalBlocked">0</div><div>总拦截次数</div></div></div>
+  </header>
+  <section>
+    <div><h2>屏蔽网站</h2><p class="desc">访问这些网站时，Focus 会自动重定向到专注页面。可为网站设置<b>每日访问次数限额</b>：每天前 N 次访问放行（同一标签页内的站内跳转只算一次），用完后屏蔽，次日零点自动重置。</p></div>
+    <div>
+      <div class="bar"><span class="muted" id="sitesSummary">0 个网站</span><button class="b2" id="addSiteBtn">添加网站</button></div>
+      <div class="form" id="addForm" hidden>
+        <h3>添加新网站</h3>
+        <div class="grid g4">
+          <div><label for="domainInput">网站域名</label><input id="domainInput" placeholder="例如: bilibili.com"></div>
+          <div><label for="nameInput">显示名称</label><input id="nameInput" placeholder="例如: 哔哩哔哩"></div>
+          <div><label for="limitInput">每日访问次数</label><input id="limitInput" type="number" min="0" step="1" inputmode="numeric" placeholder="不限" aria-describedby="limitHelp"><div class="help" id="limitHelp">留空或 0 表示始终屏蔽；设为 N 则每天允许 N 次</div></div>
+        </div>
+        <div class="acts"><button class="b2" id="cancelBtn">取消</button><button class="b" id="saveBtn">保存</button></div>
       </div>
-      <div class="stat-card">
-        <div class="stat-number" id="totalBlocked">0</div>
-        <div class="stat-label">总拦截次数</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number" id="totalSaved">0</div>
-        <div class="stat-label">节省时间(小时)</div>
-      </div>
+      <div id="sitesList"></div>
     </div>
-
-    <!-- 自定义提示语 -->
-    <div class="section">
-      <h2 class="section-title">自定义提示语</h2>
-      <p class="section-description">
-        设置当你被重定向时显示的专注提醒语，让提醒更加个性化和有动力。
-      </p>
-
-      <div class="form-group">
-        <textarea id="customMessageInput" placeholder="保持专注" maxlength="200" rows="3"></textarea>
-        <div class="form-help">最多200个字符，将显示在专注页面的顶部</div>
+  </section>
+  <section>
+    <div><h2>白名单</h2><p class="desc">即使网站被屏蔽，白名单里的子域名或页面仍然允许访问。<br><b>纯域名</b>（如 creator.xiaohongshu.com）匹配该域名及其子域名；<b>域名+路径前缀</b>（如 space.bilibili.com/12345）匹配该路径及其下所有页面。</p></div>
+    <div>
+      <div class="bar"><span class="muted" id="allowSummary">0 条规则</span><button class="b2" id="addAllowBtn">添加白名单规则</button></div>
+      <div class="form" id="addAllowForm" hidden>
+        <h3>添加白名单规则</h3>
+        <div><label for="allowRuleInput">域名或域名+路径</label><input id="allowRuleInput" placeholder="例如: space.bilibili.com/12345"><div class="help">可以直接粘贴完整网址，会自动去掉 http(s):// 和 www.</div></div>
+        <div class="acts"><button class="b2" id="cancelAllowBtn">取消</button><button class="b" id="saveAllowBtn">保存</button></div>
       </div>
-
-      <div class="message-source-row">
-        <div class="form-group">
-          <label for="messageSourceInput">来源（可选）</label>
-          <input type="text" id="messageSourceInput" placeholder="例如: 乔布斯" maxlength="30">
-          <div class="form-help">提示语的出处或作者，显示在提示语下方</div>
-        </div>
-        <div class="form-group">
-          <label for="messageAvatarInput">来源头像（可选）</label>
-          <input type="text" id="messageAvatarInput" placeholder="头像图片URL，例如: https://example.com/avatar.jpg">
-          <div class="form-help">图片URL，将以圆形头像显示在来源旁边</div>
-        </div>
-      </div>
-
-      <div class="custom-message-actions">
-        <button class="btn btn-primary" id="saveMessageBtn">保存提示语</button>
-      </div>
+      <div id="allowList"></div>
     </div>
-
-    <!-- 网站管理 -->
-    <div class="section">
-      <h2 class="section-title">屏蔽网站管理</h2>
-      <p class="section-description">
-        添加或移除你想要屏蔽的网站。当你访问这些网站时，Focus会自动重定向到专注页面，帮助你保持专注。也可以为网站设置每日访问次数限额：每天前N次访问放行（同一标签页内的站内跳转只算一次），用完后屏蔽，次日零点自动重置。
-      </p>
-
-      <button class="btn btn-success" id="addSiteBtn">
-        ✨ 添加新网站
-      </button>
-
-      <!-- 添加网站表单 -->
-      <div class="add-form" id="addForm">
-        <div class="form-row" style="grid-template-columns: 1fr 1fr 120px 120px;">
-          <div class="form-group">
-            <label for="domainInput">网站域名</label>
-            <input type="text" id="domainInput" placeholder="例如: youtube.com">
-          </div>
-          <div class="form-group">
-            <label for="nameInput">显示名称</label>
-            <input type="text" id="nameInput" placeholder="例如: YouTube">
-          </div>
-          <div class="form-group">
-            <label for="timeInput">平均时长(分钟)</label>
-            <input type="number" id="timeInput" placeholder="30" min="1" max="300">
-            <div class="form-help">用于统计帮助你专注的时间，每次阻止访问时会累加此时长</div>
-          </div>
-          <div class="form-group">
-            <label for="limitInput">每日访问次数</label>
-            <input type="number" id="limitInput" placeholder="不限" min="0" max="100">
-            <div class="form-help">留空或0表示始终屏蔽；设为N则每天允许访问N次，用完后屏蔽</div>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-secondary" id="cancelBtn">取消</button>
-          <button class="btn btn-primary" id="saveBtn">保存</button>
-        </div>
+  </section>
+  <section>
+    <div><h2>自定义提示语</h2><p class="desc">被重定向时显示在专注页面顶部的提醒语，让提醒更个性化、更有动力。</p></div>
+    <div>
+      <label for="customMessageInput">提示语</label><textarea id="customMessageInput" maxlength="200" rows="2"></textarea>
+      <div class="cnt"><b id="messageCount">0</b> / 200 字符 · 将显示在专注页面顶部</div>
+      <div class="grid g2 source-fields">
+        <div><label for="messageSourceInput">来源（可选）</label><input id="messageSourceInput" maxlength="30"><div class="help">提示语的出处或作者，显示在提示语下方 · 最多 30 字</div></div>
+        <div><label for="messageAvatarInput">来源头像（可选）</label><input id="messageAvatarInput" type="url"><div class="help">图片 URL，将以圆形头像显示在来源旁边</div></div>
       </div>
-
-      <!-- 网站列表 -->
-      <div class="sites-list" id="sitesList">
-        <!-- 动态生成 -->
-      </div>
+      <div class="acts"><button class="b" id="saveMessageBtn">保存提示语</button></div>
     </div>
-
-    <!-- 白名单管理 -->
-    <div class="section">
-      <h2 class="section-title">白名单</h2>
-      <p class="section-description">
-        即使某个网站被屏蔽，白名单里的子域名或页面仍然允许访问。规则支持两种写法：纯域名（如 creator.xiaohongshu.com，匹配该域名及其子域名）和域名+路径前缀（如 space.bilibili.com/12345，匹配该路径及其下所有页面）。
-      </p>
-
-      <button class="btn btn-success" id="addAllowBtn">
-        ✅ 添加白名单规则
-      </button>
-
-      <!-- 添加白名单表单 -->
-      <div class="add-form" id="addAllowForm">
-        <div class="form-row">
-          <div class="form-group">
-            <label for="allowRuleInput">域名或域名+路径</label>
-            <input type="text" id="allowRuleInput" placeholder="例如: space.bilibili.com/12345">
-            <div class="form-help">可以直接粘贴完整网址，会自动去掉 http(s):// 和 www.</div>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-secondary" id="cancelAllowBtn">取消</button>
-          <button class="btn btn-primary" id="saveAllowBtn">保存</button>
-        </div>
-      </div>
-
-      <!-- 白名单列表 -->
-      <div class="sites-list" id="allowList">
-        <!-- 动态生成 -->
-      </div>
-    </div>
-  </div>
-
+  </section>
   <script src="settings.js"></script>
 </body>
-
 </html>

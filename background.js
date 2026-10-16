@@ -1,10 +1,10 @@
 // 默认的被屏蔽网站列表
 const defaultBlockedSites = [
-  { domain: "x.com", name: "X (Twitter)", avgTime: 30 },
-  { domain: "youtube.com", name: "YouTube", avgTime: 45 },
-  { domain: "twitter.com", name: "Twitter", avgTime: 30 },
-  { domain: "xiaohongshu.com", name: "小红书", avgTime: 40 },
-  { domain: "bilibili.com", name: "B站", avgTime: 45 }
+  { domain: "x.com", name: "X (Twitter)" },
+  { domain: "youtube.com", name: "YouTube" },
+  { domain: "twitter.com", name: "Twitter" },
+  { domain: "xiaohongshu.com", name: "小红书" },
+  { domain: "bilibili.com", name: "B站" }
 ];
 
 // 重定向目标URL
@@ -185,9 +185,8 @@ async function updateVisitStats(blockedSite) {
   const userId = await getUserId();
 
   // 获取当前统计数据
-  const data = await chrome.storage.local.get(['visitStats', 'totalSavedTime']);
+  const data = await chrome.storage.local.get(['visitStats']);
   const stats = data.visitStats || {};
-  let totalSavedTime = data.totalSavedTime || 0;
 
   // 初始化今天的统计
   if (!stats[today]) {
@@ -197,55 +196,17 @@ async function updateVisitStats(blockedSite) {
     stats[today][blockedSite.domain] = 0;
   }
 
-  // 增加计数和保存的时间
+  // 增加拦截计数
   stats[today][blockedSite.domain]++;
-  totalSavedTime += blockedSite.avgTime;
 
   // 保存更新后的统计数据
   await chrome.storage.local.set({
-    visitStats: stats,
-    totalSavedTime: totalSavedTime
+    visitStats: stats
   });
 
   return {
-    todayCount: stats[today][blockedSite.domain],
-    totalSavedMinutes: totalSavedTime
+    todayCount: stats[today][blockedSite.domain]
   };
-}
-
-// 从存储中获取禁用状态
-async function getDisableState() {
-  const data = await chrome.storage.local.get(['disableEndTime']);
-
-  if (!data.disableEndTime) return { isDisabled: false, endTime: null };
-
-  // 检查是否已过期
-  if (Date.now() >= data.disableEndTime) {
-    await chrome.storage.local.remove(['disableEndTime']);
-    return { isDisabled: false, endTime: null };
-  }
-
-  return { isDisabled: true, endTime: data.disableEndTime };
-}
-
-// 临时禁用阻止功能
-async function temporarilyDisableBlocking(minutes) {
-  const endTime = Date.now() + (minutes * 60 * 1000);
-  await chrome.storage.local.set({ disableEndTime: endTime });
-
-  // 指定时间后重新启用
-  setTimeout(async () => {
-    const currentState = await getDisableState();
-    if (currentState.endTime === endTime) {
-      await chrome.storage.local.remove(['disableEndTime']);
-    }
-  }, minutes * 60 * 1000);
-}
-
-// 检查是否处于禁用状态
-async function checkDisableStatus() {
-  const state = await getDisableState();
-  return state.isDisabled;
 }
 
 // 从URL中提取域名
@@ -263,9 +224,6 @@ function extractDomain(url) {
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   // 只处理主框架的导航
   if (details.frameId !== 0) return;
-
-  // 如果临时禁用了阻止功能，直接返回
-  if (await checkDisableStatus()) return;
 
   // 获取域名
   const domain = extractDomain(details.url);
@@ -312,9 +270,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   // 构建重定向URL，包含统计信息
   const redirectUrl = new URL(destinationUrl);
   redirectUrl.searchParams.set('site', blockedSite.name);
+  redirectUrl.searchParams.set('domain', domain);
   redirectUrl.searchParams.set('count', stats.todayCount);
-  redirectUrl.searchParams.set('savedTime', stats.totalSavedMinutes);
-  redirectUrl.searchParams.set('avgTime', blockedSite.avgTime);
   if (hasDailyLimit(blockedSite)) {
     redirectUrl.searchParams.set('dailyLimit', String(blockedSite.dailyLimit));
     redirectUrl.searchParams.set('dailyUsed', String(blockedSite.dailyLimit));
@@ -326,6 +283,18 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
 // 监听扩展安装事件
 chrome.runtime.onInstalled.addListener(async () => {
+  // 1.5 迁移：仅清理旧功能字段，保留网站、限额、白名单和拦截统计。
+  try {
+    await chrome.storage.local.remove(['avgTime', 'totalSavedTime', 'savedTime', 'disableEndTime', 'disabledUntil']);
+    const { blockedSites } = await chrome.storage.local.get(['blockedSites']);
+    if (Array.isArray(blockedSites) && blockedSites.some(site => 'avgTime' in site)) {
+      await chrome.storage.local.set({
+        blockedSites: blockedSites.map(({ avgTime, ...site }) => site)
+      });
+    }
+  } catch (error) {
+    console.error('清理旧版存储失败:', error);
+  }
   // 确保用户ID存在
   await getUserId();
   // 初始化默认屏蔽网站列表
@@ -336,29 +305,13 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // 监听来自扩展popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'temporarilyDisable') {
-    temporarilyDisableBlocking(request.minutes)
-      .then(() => sendResponse({ success: true }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
-    return true; // 表示我们会异步发送响应
-  } else if (request.action === 'getDisableStatus') {
-    getDisableState()
-      .then(state => {
-        const remainingTime = state.endTime ? Math.max(0, Math.floor((state.endTime - Date.now()) / 1000)) : 0;
-        sendResponse({
-          isDisabled: state.isDisabled,
-          remainingSeconds: remainingTime
-        });
-      })
-      .catch(error => sendResponse({ isDisabled: false, remainingSeconds: 0, error: error.message }));
-    return true; // 表示我们会异步发送响应
-  } else if (request.action === 'getBlockedSites') {
+  if (request.action === 'getBlockedSites') {
     getBlockedSites()
       .then(sites => sendResponse({ success: true, sites }))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   } else if (request.action === 'addBlockedSite') {
-    const { domain, name, avgTime, dailyLimit } = request;
+    const { domain, name, dailyLimit } = request;
     getBlockedSites()
       .then(async sites => {
         // 检查是否已存在
@@ -367,7 +320,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
         // 添加新网站（dailyLimit 为正整数时启用每日限额，否则始终屏蔽）
-        const site = { domain, name, avgTime };
+        const site = { domain, name };
         if (Number.isInteger(dailyLimit) && dailyLimit > 0) {
           site.dailyLimit = dailyLimit;
         }
@@ -421,7 +374,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   } else if (request.action === 'updateBlockedSite') {
-    const { domain, name, avgTime, dailyLimit } = request;
+    const { domain, name, dailyLimit } = request;
     getBlockedSites()
       .then(async sites => {
         const siteIndex = sites.findIndex(site => site.domain === domain);
@@ -429,7 +382,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: '找不到该网站' });
           return;
         }
-        const site = { domain, name, avgTime };
+        const site = { domain, name };
         if (Number.isInteger(dailyLimit) && dailyLimit > 0) {
           site.dailyLimit = dailyLimit;
         }

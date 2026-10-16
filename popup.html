@@ -1,153 +1,31 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Focus - 专注助手</title>
+  <link rel="stylesheet" href="styles.css">
   <style>
-    body {
-      width: 280px;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      margin: 0;
-    }
+body{width:360px;padding:22px 22px 18px}
+.top{display:flex;justify-content:space-between;align-items:baseline}
+.top b{font-size:1.05rem;font-weight:900}.top span{font-size:.75rem;color:var(--faint)}
+.hero{margin:26px 0 4px;display:flex;align-items:flex-end;gap:12px}
+.hero .num{font-size:5rem}.hero p{margin:0 0 8px;font-size:.95rem;line-height:1.35;color:var(--muted)}
+.state{font-size:1rem;font-weight:700;margin:18px 0 0}.state i{font-style:normal;display:inline-block;width:10px;height:10px;background:var(--ok);margin-right:8px}
+.h3{font-size:.8rem;font-weight:700;color:var(--muted);margin:24px 0 6px}
+.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--rule);font-size:.95rem}
+.row b{font-weight:800}.row b.x{color:var(--accent-ink)}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:22px;font-size:.9rem}
 
-    .container {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 20px;
-      color: #2c3e50;
-    }
-
-    .header h1 {
-      font-size: 18px;
-      margin: 0 0 8px 0;
-    }
-
-    .header .version {
-      font-size: 11px;
-      font-weight: normal;
-      color: #95a5a6;
-      margin-left: 4px;
-    }
-
-    .stats {
-      background: #f8f9fa;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      text-align: center;
-      color: #34495e;
-    }
-
-    .stats .number {
-      font-size: 24px;
-      font-weight: bold;
-      color: #3498db;
-      margin: 4px 0;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border: none;
-      border-radius: 6px;
-      background: #3498db;
-      color: white;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background 0.3s;
-    }
-
-    button:hover {
-      background: #2980b9;
-    }
-
-    button:disabled {
-      background: #bdc3c7;
-      cursor: not-allowed;
-    }
-
-    .countdown {
-      text-align: center;
-      color: #e74c3c;
-      font-weight: bold;
-      margin-top: 12px;
-      font-size: 14px;
-    }
-
-    .daily-limits {
-      display: none;
-      background: #f8f9fa;
-      padding: 10px 12px;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      font-size: 13px;
-      color: #34495e;
-    }
-
-    .limits-title {
-      color: #7f8c8d;
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-
-    .limit-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 2px 0;
-    }
-
-    .limit-value {
-      font-weight: bold;
-      color: #27ae60;
-    }
-
-    .limit-value.exhausted {
-      color: #e74c3c;
-    }
-
-    .settings-btn {
-      background: #34495e;
-      margin-top: 12px;
-    }
-
-    .settings-btn:hover {
-      background: #2c3e50;
-    }
+.top h1{margin:0;font-size:1.05rem;font-weight:900}
   </style>
 </head>
-
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>Focus 专注助手 <span class="version" id="version"></span></h1>
-      <div>保持专注，提升效率</div>
-    </div>
-
-    <div class="stats">
-      <div>今日已阻止访问</div>
-      <div class="number" id="todayCount">0</div>
-      <div>次干扰</div>
-    </div>
-
-    <div class="daily-limits" id="dailyLimits"></div>
-
-    <button id="disable1MinButton">暂停阻止 1 分钟</button>
-    <button id="disable5MinButton">暂停阻止 5 分钟</button>
-    <button id="disable1HourButton">暂停阻止 1 小时</button>
-    <div class="countdown" id="countdown"></div>
-
-    <button class="settings-btn" id="settingsBtn">⚙️ 设置</button>
-  </div>
+  <header class="top"><h1>Focus 专注助手</h1><span id="version"></span></header>
+  <div class="hero"><div class="num" id="todayCount">0</div><p>次干扰<br>今日已被阻止</p></div>
+  <div class="state"><i aria-hidden="true"></i><span id="statusText">正在保持专注</span></div>
+  <div id="dailyLimits" hidden></div>
+  <div class="foot"><span class="faint">保持专注，提升效率</span><button class="lk" id="settingsBtn">打开设置<svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M2 8h11M9 3.5 13.5 8 9 12.5"/></svg></button></div>
   <script src="popup.js"></script>
 </body>
-
 </html>
