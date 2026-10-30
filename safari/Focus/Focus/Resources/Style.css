@@ -1,0 +1,14 @@
+:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+html, body { height: 100%; margin: 0; }
+body {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px; background: #f1efe9; color: #161513; text-align: center;
+}
+h1 { margin: 0; font-size: 32px; }
+p { margin: 0 24px; color: #5c5a54; line-height: 1.6; }
+button {
+    margin-top: 12px; padding: 12px 24px; border: 0; background: #c63c1b; color: white;
+    font: inherit; font-weight: 600; cursor: pointer;
+}
+button:hover { background: #a83217; }
+button:focus-visible { outline: 2px solid #161513; outline-offset: 4px; }

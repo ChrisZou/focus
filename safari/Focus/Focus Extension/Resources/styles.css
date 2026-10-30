@@ -1,0 +1,24 @@
+:root{--bg:#f1efe9;--ink:#161513;--muted:#5c5a54;--faint:#6b675f;--disabled-ink:#8d897f;--rule:#d9d5cb;--accent:#d6411e;--accent-ink:#b8361a;--btn:#c63c1b;--btn-h:#a83217;--ok:#1f7a4a}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif;font-variant-numeric:tabular-nums}
+.num{font-weight:900;letter-spacing:-.03em;line-height:1}
+.muted{color:var(--muted)}.faint{color:var(--faint)}.acc{color:var(--accent)}.acc-ink{color:var(--accent-ink)}.okc{color:var(--ok)}
+button{font:inherit;border:0;border-radius:0;cursor:pointer;font-weight:700}
+.b{background:var(--btn);color:#fff;padding:.8rem 1.6rem}
+.b2{background:transparent;color:var(--ink);border:2px solid var(--ink);padding:calc(.8rem - 2px) 1.4rem}
+.b:disabled,.b2:disabled{background:var(--rule);color:var(--disabled-ink);border-color:var(--rule);cursor:not-allowed}
+.lk{background:none;padding:0;font-weight:700;color:var(--ink);text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}
+.lk{padding:.6rem 0}.lk.del{color:var(--accent-ink)}
+input,textarea{width:100%;font:inherit;font-size:1.15rem;font-weight:500;color:var(--ink);background:transparent;border:0;border-bottom:3px solid var(--ink);border-radius:0;padding:.4rem 0;outline:none;caret-color:var(--accent);resize:none}
+input::placeholder,textarea::placeholder{color:var(--faint);font-weight:400}
+input.focus{border-bottom-color:var(--accent)}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:.2rem}
+.help{font-size:.8rem;color:var(--faint);margin-top:.4rem;line-height:1.5}
+::selection{background:#f3c3b5;color:var(--ink)}
+.b:hover:not(:disabled){background:var(--btn-h)}.b2:hover:not(:disabled){background:var(--ink);color:var(--bg)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+input:focus-visible,textarea:focus-visible{border-bottom-color:var(--accent)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.arrow{width:.9em;height:.9em;vertical-align:-.08em;margin-left:.3em}
+
+[hidden]{display:none!important}

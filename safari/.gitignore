@@ -1,0 +1,5 @@
+.build/
+.staging/
+**/xcuserdata/
+*.xcuserstate
+.DS_Store

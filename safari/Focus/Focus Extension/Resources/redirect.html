@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Focus - 保持专注</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+html,body{height:100%}
+body{min-height:100vh;padding:9rem 6rem 4.5rem;display:flex;flex-direction:column;justify-content:space-between;gap:3rem}
+.notice{font-size:1.5rem;font-weight:700;color:var(--accent-ink);margin:2rem 0 0}
+h1{margin:0;max-width:14em;font-size:4.25rem;font-weight:900;line-height:1.12;letter-spacing:-.03em;white-space:pre-wrap;overflow-wrap:anywhere;text-wrap:balance}
+.src{display:flex;align-items:center;gap:1rem;margin-top:2rem;font-size:1.25rem;color:var(--muted)}
+.src img{width:56px;height:56px;border-radius:50%;object-fit:cover}
+.src span::before{content:"— "}
+.low{display:grid;grid-template-columns:1fr auto;gap:3rem;align-items:end}
+.site{font-size:1.25rem;color:var(--muted)}.site b{color:var(--ink)}
+.st{grid-column:2;text-align:right}.st .num{display:block;font-size:6rem}.st small{display:block;margin-top:.6rem}.st small{font-size:1rem;color:var(--muted)}
+
+main{display:contents}
+  </style>
+</head>
+<body>
+  <main>
+    <div>
+      <h1>保持专注</h1>
+      <div class="src" id="messageSource" hidden><img id="sourceAvatar" alt="来源头像" hidden><span id="sourceName" hidden></span></div>
+      <p class="notice" id="limitNotice" hidden></p>
+    </div>
+    <div class="low">
+      <div class="site" id="attemptedSite" hidden>你刚刚想打开 <b id="siteName"></b></div>
+      <div class="st"><span class="num" id="todayCount">0 次</span><small id="siteStats"></small></div>
+    </div>
+  </main>
+  <script src="redirect.js"></script>
+</body>
+</html>
