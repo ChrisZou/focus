@@ -41,6 +41,16 @@ pluginkit -mAvvv -i com.chriszou.focus.safari.Extension
 - `runtime.getURL()` 自动生成扩展 URL；后台用 `tabs.update()` 打开 confirm/redirect，popup 用 `tabs.create()` 打开 settings。这些是扩展内部导航，无需向网页公开 `web_accessible_resources`。异步消息保留原有 `return true` / `sendResponse`。
 - 与 Chrome 一样，这是导航后重定向，不是网络请求防火墙；页面可能短暂加载。Safari 内置页不属于 HTTP/HTTPS 权限范围。存储与 Chrome 独立；无自动迁移/同步。隐私浏览需要单独启用并授权，未在本次验收范围内。弹窗「正在保持专注」保留 1.5 行为，不代表已授予网站权限。
 
+## 导航拦截可靠性修复
+
+根目录与 Safari 共用 `onCommitted` 拦截主文档，`onBeforeNavigate` 仅使该标签页旧的异步检查失效；关闭标签页也使旧检查失效。跳转 Promise 的错误会被记录。白名单、限额、确认页与 session 放行凭证沿用原规则，离站凭证清理改为实际提交后执行，取消的导航不会误清理。manifest 差异仍只由同步脚本生成。
+
+原代码仅在 `onBeforeNavigate` 中异步读取存储后调用 `tabs.update`，没有任何提交阶段检查；注释将其描述为“取消当前导航”，但导航通知没有取消返回值。[API 文档](https://developer.chrome.com/docs/extensions/reference/api/webNavigation)区分导航开始与文档提交，并说明同一主框架可能有重叠的导航序列。新增模拟将网页提交与 `tabs.update` 独立驱动：如果原网页在早期跳转后仍提交，旧实现最终停在 YouTube；如果只观察到提交事件，旧实现完全不拦截。两种情况在修复后都会跳到 Focus，且不会重复统计同一次提交。
+
+这是已复现的代码缺口，并非 Safari 26.3 实际事件顺序的取证。模拟中“原导航继续提交”和“未观察到开始事件”是显式输入条件，不能证明 Safari 确实如此；后台未启动或未收到任何导航事件也不在此修复的保证范围内。拦截现在等待文档提交，可能短暂显示网页；没有文档提交的挂起请求不会触发拦截。真实 Safari 的 15 秒观察仍需后续安装新版后完成。
+
+本次验证仅运行 Node 测试，不构建或安装应用，不运行依赖打包 `.appex` 的原生 WebKit smoke test。现用 `safari/.build/Build/Products/Debug/Focus.app` 和 Safari 扩展均未更新，未重新注册；无需改变已确认的 Safari 授权设置。后续获准更新后，再在新标签页重复 YouTube 首页、限额确认和离站返回测试，并持续观察至少 15 秒。
+
 ## 同步 Chrome 更新
 
 只编辑根目录业务文件，再运行 `python3 safari/scripts/sync-resources.py` 并重新构建。脚本将十个业务文件和 `icons/` 复制到 `Focus/Focus Extension/Resources/`，重写上述两项 manifest 差异。不要直接修改复制的文件。以后新增资源时，也需更新脚本文件列表及 Xcode 扩展 target 的 Copy Bundle Resources。
@@ -57,7 +67,7 @@ xcrun safari-web-extension-converter safari/.staging --project-location safari \
 ## 验证
 
 ```sh
-node --test safari/tests/behavior.test.mjs
+node --test safari/tests/*.test.mjs
 # 以下原生测试需要 macOS 15.4+，仅使用隔离的 WebKit 测试上下文：
 xcrun swiftc -parse-as-library safari/tests/validate-manifest.swift \
   -o safari/.build/validate-manifest
@@ -66,5 +76,7 @@ safari/.build/validate-manifest \
 ```
 
 本机 macOS 26.2 / Safari 26.2：Debug `xcodebuild` 成功；六项 Node 回归测试验证资源一致、白名单、限额/跨日/后台重载、设置消息、1.5 迁移和输入防粘贴；原生 WebKit 验证打包 manifest、后台消息、local/session storage 和四个扩展页面。Safari 17 / Sequoia 兼容性依据 Apple 文档和 macOS 14 deployment target，未在这些旧系统上实机测试。
+
+导航修复新增 22 项测试（根目录 Chrome MV3 与 Safari 资源各 11 项），连同原有 6 项共 28 项通过。测试包括覆盖早期跳转的网页提交、仅提交事件、重复提交、已取消的离站、iframe、异步存储期间的新导航和关闭标签页、不同标签页并行、跳转拒绝后的重试。使用 `FOCUS_BACKGROUND_SOURCE=/tmp/old-background.js` 可让导航测试运行指定旧源码；在 `be573a5` 源码上运行 `--test-name-pattern 'outlives an early|without an observed|aborted provisional|unblocked commit'`，共 8 项中 6 项失败、2 项通过。
 
 授权后手动验收：设 YouTube 每日限额为 1 → 尝试粘贴（应拒绝）→ 手输确认进入 → 同标签页站内跳转不重复计数 → 离开到其他网站后再返回应屏蔽；检查弹窗剩余次数、白名单路径和设置行内编辑。Safari 实际导航/权限流程需完成上述手动步骤后验证。[Apple 运行说明](https://developer.apple.com/documentation/safariservices/running-your-safari-web-extension)

@@ -159,18 +159,20 @@ async function incrementDailyVisitCount(domain) {
 }
 
 // 标签页离开限额网站后清除记录，再次进入时计为一次新访问
-async function clearTabVisit(tabId) {
+async function clearTabVisit(tabId, isCurrent = () => true) {
   const session = await chrome.storage.session.get(['tabVisits']);
   const tabVisits = session.tabVisits || {};
   const tabKey = String(tabId);
-  if (tabKey in tabVisits) {
+  if (isCurrent() && tabKey in tabVisits) {
     delete tabVisits[tabKey];
     await chrome.storage.session.set({ tabVisits });
   }
 }
 
 // 标签页关闭时清除记录
+const tabNavigations = new Map();
 chrome.tabs.onRemoved.addListener((tabId) => {
+  tabNavigations.delete(tabId);
   clearTabVisit(tabId);
 });
 
@@ -220,11 +222,23 @@ function extractDomain(url) {
   }
 }
 
-// 监听导航开始前的事件
-chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
-  // 只处理主框架的导航
-  if (details.frameId !== 0) return;
+// onBeforeNavigate 是通知，不能取消原导航。只用它使旧的异步检查失效；
+// 等文档实际提交后再拦截，避免抢跑的 tabs.update 被原导航覆盖。
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId === 0) tabNavigations.set(details.tabId, {});
+});
 
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  const navigation = {};
+  tabNavigations.set(details.tabId, navigation);
+  const isCurrent = () => tabNavigations.get(details.tabId) === navigation;
+  return interceptCommittedNavigation(details, isCurrent).catch(error => {
+    console.error('导航拦截失败:', error);
+  });
+});
+
+async function interceptCommittedNavigation(details, isCurrent) {
   // 获取域名
   const domain = extractDomain(details.url);
 
@@ -233,11 +247,12 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
   // 获取用户配置的屏蔽网站列表
   const blockedSites = await getBlockedSites();
+  if (!isCurrent()) return;
 
   // 检查是否需要阻止（匹配域名本身及其所有子域名）
   const blockedSite = blockedSites.find(site => hostMatches(domain, site.domain));
   if (!blockedSite) {
-    await clearTabVisit(details.tabId);
+    await clearTabVisit(details.tabId, isCurrent);
     return;
   }
 
@@ -245,6 +260,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (hasDailyLimit(blockedSite)) {
     // 同一标签页内在该网站内部跳转/刷新，不重复计数（同一天内）
     const session = await chrome.storage.session.get(['tabVisits']);
+    if (!isCurrent()) return;
     const tabVisits = session.tabVisits || {};
     const tabKey = String(details.tabId);
     const sessionKey = getTodayString() + '|' + blockedSite.domain;
@@ -252,6 +268,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
     // 未达限额：先跳转到确认页，用户点击“确认进入”后才计数并放行
     const used = await getDailyVisitCount(blockedSite.domain);
+    if (!isCurrent()) return;
     if (used < blockedSite.dailyLimit) {
       const confirmUrl = new URL(confirmPageUrl);
       confirmUrl.searchParams.set('site', blockedSite.name);
@@ -259,13 +276,14 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
       confirmUrl.searchParams.set('target', details.url);
       confirmUrl.searchParams.set('dailyLimit', String(blockedSite.dailyLimit));
       confirmUrl.searchParams.set('dailyUsed', String(used));
-      chrome.tabs.update(details.tabId, { url: confirmUrl.toString() });
+      await chrome.tabs.update(details.tabId, { url: confirmUrl.toString() });
       return;
     }
   }
 
   // 更新访问统计（被拦截）
   const stats = await updateVisitStats(blockedSite);
+  if (!isCurrent()) return;
 
   // 构建重定向URL，包含统计信息
   const redirectUrl = new URL(destinationUrl);
@@ -277,9 +295,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     redirectUrl.searchParams.set('dailyUsed', String(blockedSite.dailyLimit));
   }
 
-  // 取消当前导航并重定向到目标URL
-  chrome.tabs.update(details.tabId, { url: redirectUrl.toString() });
-});
+  // 将已提交的文档重定向到扩展页面；这不是网络请求级的取消。
+  await chrome.tabs.update(details.tabId, { url: redirectUrl.toString() });
+}
 
 // 监听扩展安装事件
 chrome.runtime.onInstalled.addListener(async () => {
@@ -446,4 +464,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   }
-}); 
+});

@@ -26,7 +26,7 @@ function background(seed = {}) {
       getURL: name => `safari-web-extension://focus-test/${name}`,
       onInstalled: event('installed'), onMessage: event('message'),
     },
-    webNavigation: { onBeforeNavigate: event('navigate') },
+    webNavigation: { onBeforeNavigate: event('before'), onCommitted: event('committed') },
     tabs: {
       onRemoved: event('removed'),
       update: async (tabId, properties) => { updates.push({ tabId, ...properties }); },
@@ -42,7 +42,11 @@ function background(seed = {}) {
     local, session, updates, listeners,
     nextDay() { now = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12); },
     day: () => today(now),
-    navigate: (url, tabId = 1, frameId = 0) => listeners.navigate({ url, tabId, frameId }),
+    navigate: async (url, tabId = 1, frameId = 0) => {
+      const details = { url, tabId, frameId };
+      await listeners.before?.(details);
+      await listeners.committed?.(details);
+    },
     message: (request, tabId = 1) => new Promise((resolve, reject) => {
       if (listeners.message(request, { tab: { id: tabId } }, resolve) !== true) reject(new Error('Missing async response channel'));
     }),
