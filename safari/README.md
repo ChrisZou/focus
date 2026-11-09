@@ -49,7 +49,9 @@ pluginkit -mAvvv -i com.chriszou.focus.safari.Extension
 
 这是已复现的代码缺口，并非 Safari 26.3 实际事件顺序的取证。模拟中“原导航继续提交”和“未观察到开始事件”是显式输入条件，不能证明 Safari 确实如此；后台未启动或未收到任何导航事件也不在此修复的保证范围内。拦截现在等待文档提交，可能短暂显示网页；没有文档提交的挂起请求不会触发拦截。真实 Safari 的 15 秒观察仍需后续安装新版后完成。
 
-本次验证仅运行 Node 测试，不构建或安装应用，不运行依赖打包 `.appex` 的原生 WebKit smoke test。现用 `safari/.build/Build/Products/Debug/Focus.app` 和 Safari 扩展均未更新，未重新注册；无需改变已确认的 Safari 授权设置。后续获准更新后，再在新标签页重复 YouTube 首页、限额确认和离站返回测试，并持续观察至少 15 秒。
+2026-11-09 的 live 验收已经否定了“5507b14 已解决 Safari 故障”：安装文件与源码一致，后台强制加载后 YouTube 仍停留在首页至少 20 秒。当前根因尚未证实，不能仅归因于后台唤醒。详见 [本轮取证和交接](INVESTIGATION-20261109.md)。
+
+本轮加入临时内存诊断，并修复确认流程的两个未等待 `tabs.update()` 调用：API 拒绝时向确认页返回失败，避免假报成功。此缺口有旧源码失败测试，但不能解释尚未进入确认页的首页故障。
 
 ## 同步 Chrome 更新
 
@@ -76,6 +78,15 @@ safari/.build/validate-manifest \
 ```
 
 本机 macOS 26.2 / Safari 26.2：Debug `xcodebuild` 成功；六项 Node 回归测试验证资源一致、白名单、限额/跨日/后台重载、设置消息、1.5 迁移和输入防粘贴；原生 WebKit 验证打包 manifest、后台消息、local/session storage 和四个扩展页面。Safari 17 / Sequoia 兼容性依据 Apple 文档和 macOS 14 deployment target，未在这些旧系统上实机测试。
+
+本轮在 macOS 26.3 / Xcode 26.6 下扩展原生测试，以回环 HTTP 页面触发真实 WebKit 导航和 `tabs.update()`，验证扩展页完成加载、确认消息放行、刷新、离站返回后额度耗尽屏蔽。测试不创建可见窗口、不操作 Safari、不使用持久用户配置。运行：
+
+```sh
+xcrun swiftc -parse-as-library safari/tests/validate-manifest.swift -o /tmp/focus-validate-manifest
+python3 safari/tests/run-webkit.py /tmp/focus-validate-manifest '/path/to/Focus Extension.appex'
+```
+
+测试宿主按 WebKit 自身测试的做法为 HTTP 与扩展页面切换配置；直接把 HTTP WebView 用于扩展主框架会产生宿主错误 -1008，即使添加 web_accessible_resources 也一样。此现象不作为 Safari live 根因证据。Node 当前共 30 项测试，包含诊断读取不改变用户规则，以及确认跳转拒绝不再返回成功。
 
 导航修复新增 22 项测试（根目录 Chrome MV3 与 Safari 资源各 11 项），连同原有 6 项共 28 项通过。测试包括覆盖早期跳转的网页提交、仅提交事件、重复提交、已取消的离站、iframe、异步存储期间的新导航和关闭标签页、不同标签页并行、跳转拒绝后的重试。使用 `FOCUS_BACKGROUND_SOURCE=/tmp/old-background.js` 可让导航测试运行指定旧源码；在 `be573a5` 源码上运行 `--test-name-pattern 'outlives an early|without an observed|aborted provisional|unblocked commit'`，共 8 项中 6 项失败、2 项通过。
 

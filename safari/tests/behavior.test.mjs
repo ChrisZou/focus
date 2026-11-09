@@ -13,8 +13,8 @@ const today = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padSt
 function background(seed = {}) {
   const local = structuredClone(seed), session = {}, updates = [];
   const listeners = {};
-  let now = new Date(2026, 9, 30, 12);
-  const event = key => ({ addListener: listener => { listeners[key] = listener; } });
+  let now = new Date(2026, 9, 30, 12), rejectUpdates = false;
+  const event = key => ({ addListener: listener => { listeners[key] = listener; }, hasListener: listener => listeners[key] === listener });
   const area = data => ({
     async get(keys) { return structuredClone(Object.fromEntries(keys.filter(k => k in data).map(k => [k, data[k]]))); },
     async set(values) { Object.assign(data, structuredClone(values)); },
@@ -29,17 +29,21 @@ function background(seed = {}) {
     webNavigation: { onBeforeNavigate: event('before'), onCommitted: event('committed') },
     tabs: {
       onRemoved: event('removed'),
-      update: async (tabId, properties) => { updates.push({ tabId, ...properties }); },
+      update: async (tabId, properties) => {
+        if (rejectUpdates) throw new Error('Tab no longer exists');
+        updates.push({ tabId, ...properties });
+      },
     },
   };
   class Clock extends Date {
     constructor(...args) { super(...(args.length ? args : [now])); }
     static now() { return now.getTime(); }
   }
-  const context = vm.createContext({ chrome, URL, console, Date: Clock });
+  const context = vm.createContext({ chrome, URL, console: { ...console, debug() {} }, Date: Clock });
   vm.runInContext(read('background.js'), context);
   return {
     local, session, updates, listeners,
+    rejectUpdates() { rejectUpdates = true; },
     nextDay() { now = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12); },
     day: () => today(now),
     navigate: async (url, tabId = 1, frameId = 0) => {
@@ -66,6 +70,52 @@ test('Safari resources retain Chrome 1.5 behavior with Safari manifest adaptatio
   for (const icon of Object.values(manifest.icons)) {
     assert.deepEqual(readFileSync(path.join(resources, icon)), readFileSync(path.join(root, icon)));
   }
+});
+
+test('live diagnostics distinguish missing defaults, explicit empty rules, allow rules and redirect errors without mutating rules', async () => {
+  const missing = background();
+  let info = await missing.message({ action: 'getNavigationDiagnostics' });
+  assert.equal(info.build, 'safari-nav-20261109');
+  assert.equal(info.stored.blockedSites, undefined);
+  assert.equal(info.effective.blockedSites.some(s => s.domain === 'youtube.com'), true);
+  assert.deepEqual(structuredClone(info.listeners), { before: true, committed: true });
+  assert.equal(missing.local.blockedSites, undefined);
+
+  const empty = background({ blockedSites: [] });
+  await empty.navigate('https://www.youtube.com/private?token=secret');
+  info = await empty.message({ action: 'getNavigationDiagnostics' });
+  assert.equal(info.events.at(-1).stage, 'no-block-rule');
+  assert.equal(info.effective.blockedSites.length, 0);
+
+  const allowed = background({ allowList: ['youtube.com'] });
+  await allowed.navigate('https://www.youtube.com/');
+  info = await allowed.message({ action: 'getNavigationDiagnostics' });
+  assert.equal(info.events.at(-1).stage, 'allowed');
+
+  missing.rejectUpdates();
+  await missing.navigate('https://www.youtube.com/private?token=secret');
+  info = await missing.message({ action: 'getNavigationDiagnostics' });
+  assert.equal(info.events.at(-1).stage, 'error');
+  assert.equal(info.events.at(-1).error, 'Tab no longer exists');
+  for (let n = 0; n < 20; n++) await empty.navigate('https://www.youtube.com/private?token=secret');
+  info = await empty.message({ action: 'getNavigationDiagnostics' });
+  assert.equal(info.events.length, 32);
+  assert.equal(JSON.stringify(info.events).includes('private'), false);
+  assert.equal(JSON.stringify(info.events).includes('secret'), false);
+  assert.equal(empty.local.blockedSites.length, 0);
+});
+
+test('confirmation reports tabs.update rejection instead of claiming a successful entry', async () => {
+  const limited = background({ blockedSites: [{ domain: 'youtube.com', name: 'YouTube', dailyLimit: 1 }] });
+  limited.rejectUpdates();
+  let result = await limited.message({ action: 'confirmVisit', domain: 'youtube.com', target: 'https://www.youtube.com/' });
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'Tab no longer exists');
+  const changed = background({ blockedSites: [] });
+  changed.rejectUpdates();
+  result = await changed.message({ action: 'confirmVisit', domain: 'youtube.com', target: 'https://www.youtube.com/' });
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'Tab no longer exists');
 });
 
 test('blocks main-frame domains/subdomains, prioritizes domain/path allow rules', async () => {

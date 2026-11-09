@@ -21,6 +21,19 @@ const defaultAllowList = [
   "creator.xiaohongshu.com",
 ];
 
+// Temporary live-accept diagnostics. Memory-only, bounded, and host-only (no paths,
+// query strings or browsing-history persistence). Read from the background console
+// with chrome.runtime.sendMessage({ action: 'getNavigationDiagnostics' }).
+const navigationDiagnostics = { build: 'safari-nav-20261109', startedAt: Date.now(), events: [] };
+function traceNavigation(details, stage, extra = {}) {
+  const entry = { time: Date.now(), tabId: details.tabId, host: extractDomain(details.url), stage, ...extra };
+  // Extension URLs are not website hosts; don't retain their UUID/query parameters.
+  if (!/^https?:/i.test(details.url)) entry.host = '(extension/internal)';
+  navigationDiagnostics.events.push(entry);
+  if (navigationDiagnostics.events.length > 32) navigationDiagnostics.events.shift();
+  console.debug?.('[Focus navigation]', entry);
+}
+
 // 获取用户配置的白名单
 async function getAllowList() {
   const data = await chrome.storage.local.get(['allowList']);
@@ -224,51 +237,63 @@ function extractDomain(url) {
 
 // onBeforeNavigate 是通知，不能取消原导航。只用它使旧的异步检查失效；
 // 等文档实际提交后再拦截，避免抢跑的 tabs.update 被原导航覆盖。
-chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-  if (details.frameId === 0) tabNavigations.set(details.tabId, {});
-});
+function onBeforeNavigate(details) {
+  if (details.frameId === 0) {
+    traceNavigation(details, 'before');
+    tabNavigations.set(details.tabId, {});
+  }
+}
+chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigate);
 
-chrome.webNavigation.onCommitted.addListener((details) => {
+function onCommitted(details) {
   if (details.frameId !== 0) return;
+  traceNavigation(details, 'committed');
   const navigation = {};
   tabNavigations.set(details.tabId, navigation);
   const isCurrent = () => tabNavigations.get(details.tabId) === navigation;
   return interceptCommittedNavigation(details, isCurrent).catch(error => {
+    traceNavigation(details, 'error', { error: error.message });
     console.error('导航拦截失败:', error);
   });
-});
+}
+chrome.webNavigation.onCommitted.addListener(onCommitted);
 
 async function interceptCommittedNavigation(details, isCurrent) {
   // 获取域名
   const domain = extractDomain(details.url);
 
   // 检查是否在白名单中
-  if (await isUrlAllowed(details.url)) return;
+  if (await isUrlAllowed(details.url)) {
+    traceNavigation(details, 'allowed');
+    return;
+  }
 
   // 获取用户配置的屏蔽网站列表
   const blockedSites = await getBlockedSites();
-  if (!isCurrent()) return;
+  if (!isCurrent()) { traceNavigation(details, 'superseded'); return; }
 
   // 检查是否需要阻止（匹配域名本身及其所有子域名）
   const blockedSite = blockedSites.find(site => hostMatches(domain, site.domain));
   if (!blockedSite) {
+    traceNavigation(details, 'no-block-rule', { ruleCount: blockedSites.length });
     await clearTabVisit(details.tabId, isCurrent);
     return;
   }
+  traceNavigation(details, 'matched', { rule: blockedSite.domain, dailyLimit: blockedSite.dailyLimit || null });
 
   // 若配置了每日访问限额：未达限额先显示确认页（确认后才计数放行），达限额后按原逻辑屏蔽
   if (hasDailyLimit(blockedSite)) {
     // 同一标签页内在该网站内部跳转/刷新，不重复计数（同一天内）
     const session = await chrome.storage.session.get(['tabVisits']);
-    if (!isCurrent()) return;
+    if (!isCurrent()) { traceNavigation(details, 'superseded'); return; }
     const tabVisits = session.tabVisits || {};
     const tabKey = String(details.tabId);
     const sessionKey = getTodayString() + '|' + blockedSite.domain;
-    if (tabVisits[tabKey] === sessionKey) return;
+    if (tabVisits[tabKey] === sessionKey) { traceNavigation(details, 'visit-pass'); return; }
 
     // 未达限额：先跳转到确认页，用户点击“确认进入”后才计数并放行
     const used = await getDailyVisitCount(blockedSite.domain);
-    if (!isCurrent()) return;
+    if (!isCurrent()) { traceNavigation(details, 'superseded'); return; }
     if (used < blockedSite.dailyLimit) {
       const confirmUrl = new URL(confirmPageUrl);
       confirmUrl.searchParams.set('site', blockedSite.name);
@@ -276,14 +301,16 @@ async function interceptCommittedNavigation(details, isCurrent) {
       confirmUrl.searchParams.set('target', details.url);
       confirmUrl.searchParams.set('dailyLimit', String(blockedSite.dailyLimit));
       confirmUrl.searchParams.set('dailyUsed', String(used));
+      traceNavigation(details, 'redirect-request', { page: 'confirm.html' });
       await chrome.tabs.update(details.tabId, { url: confirmUrl.toString() });
+      traceNavigation(details, 'redirect-resolved', { page: 'confirm.html' });
       return;
     }
   }
 
   // 更新访问统计（被拦截）
   const stats = await updateVisitStats(blockedSite);
-  if (!isCurrent()) return;
+  if (!isCurrent()) { traceNavigation(details, 'superseded'); return; }
 
   // 构建重定向URL，包含统计信息
   const redirectUrl = new URL(destinationUrl);
@@ -296,7 +323,9 @@ async function interceptCommittedNavigation(details, isCurrent) {
   }
 
   // 将已提交的文档重定向到扩展页面；这不是网络请求级的取消。
+  traceNavigation(details, 'redirect-request', { page: 'redirect.html' });
   await chrome.tabs.update(details.tabId, { url: redirectUrl.toString() });
+  traceNavigation(details, 'redirect-resolved', { page: 'redirect.html' });
 }
 
 // 监听扩展安装事件
@@ -323,7 +352,19 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // 监听来自扩展popup的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getBlockedSites') {
+  if (request.action === 'getNavigationDiagnostics') {
+    Promise.all([chrome.storage.local.get(['blockedSites', 'allowList', 'dailyVisitCounts']), getBlockedSites(), getAllowList()])
+      .then(([stored, blockedSites, allowList]) => sendResponse({
+        success: true, ...navigationDiagnostics,
+        stored, effective: { blockedSites, allowList },
+        listeners: {
+          before: chrome.webNavigation.onBeforeNavigate.hasListener(onBeforeNavigate),
+          committed: chrome.webNavigation.onCommitted.hasListener(onCommitted)
+        }
+      }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  } else if (request.action === 'getBlockedSites') {
     getBlockedSites()
       .then(sites => sendResponse({ success: true, sites }))
       .catch(error => sendResponse({ success: false, error: error.message }));
@@ -427,7 +468,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const site = sites.find(s => s.domain === domain);
       if (!site || !hasDailyLimit(site) || !hostMatches(extractDomain(target), site.domain)) {
         // 限额已被移除或配置变更：直接前往，由导航监听按当前配置处理
-        chrome.tabs.update(tabId, { url: target });
+        await chrome.tabs.update(tabId, { url: target });
         return { success: true };
       }
       const used = await getDailyVisitCount(site.domain);
@@ -440,7 +481,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const tabVisits = session.tabVisits || {};
       tabVisits[String(tabId)] = getTodayString() + '|' + site.domain;
       await chrome.storage.session.set({ tabVisits });
-      chrome.tabs.update(tabId, { url: target });
+      await chrome.tabs.update(tabId, { url: target });
       return { success: true };
     })()
       .then(result => sendResponse(result))
