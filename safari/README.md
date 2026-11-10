@@ -57,6 +57,10 @@ pluginkit -mAvvv -i com.chriszou.focus.safari.Extension
 
 本轮加入临时内存诊断，并修复确认流程的两个未等待 `tabs.update()` 调用：API 拒绝时向确认页返回失败，避免假报成功。此缺口有旧源码失败测试，但不能解释尚未进入确认页的首页故障。
 
+## 地址栏预载导致的漏拦（2026-11-10）
+
+输入 `tw` 让 Safari 自动补全 x.com 后立刻回车：Safari 先在预载页里加载并提交网站，回车把它换进可见标签页，发给它的 `tabs.update()` **照常 resolve 但跳转丢失**（WebKit 日志只记 `Tab N was not found`），之后不再有 `onCommitted`。修复：每次跳转（或跳转报错）后 0.6 秒起、约 10 秒内轮询 `tabs.query()`，仍显示同一网站的标签页按同样规则重新拦截，不重复计数。实机无头复现（重启 Safari → 地址栏写入 `tw` → 回车）修复前 1/2 漏拦，修复后 8/8 拦截。
+
 ## 同步 Chrome 更新
 
 只编辑根目录业务文件，再运行 `python3 safari/scripts/sync-resources.py` 并重新构建。脚本将十个业务文件和 `icons/` 复制到 `Focus/Focus Extension/Resources/`，重写上述两项 manifest 差异。不要直接修改复制的文件。以后新增资源时，也需更新脚本文件列表及 Xcode 扩展 target 的 Copy Bundle Resources。

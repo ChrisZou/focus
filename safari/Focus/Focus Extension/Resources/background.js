@@ -254,7 +254,9 @@ function startInterception(details, recovery) {
   const navigation = {};
   tabNavigations.set(details.tabId, navigation);
   const isCurrent = () => tabNavigations.get(details.tabId) === navigation;
-  return interceptCommittedNavigation(details, isCurrent, recovery).catch(error => {
+  return interceptCommittedNavigation(details, isCurrent, recovery).then(redirected => {
+    if (redirected && !recovery) recoverSwappedTab(details);
+  }, error => {
     traceNavigation(details, 'error', { error: error.message });
     console.error('导航拦截失败:', error);
     if (!recovery) recoverSwappedTab(details);
@@ -262,9 +264,11 @@ function startInterception(details, recovery) {
 }
 
 // Safari 地址栏会「预载最佳匹配」：网站先在隐藏页里加载并提交，导航事件的 tabId 指向
-// 这个隐藏页。用户回车后隐藏页被换进可见标签页，原 tabId 随之失效（tabs.update 报
-// “Tab N was not found”），换入后也不会再有 onCommitted。跳转失败时，在短时间内找到
-// 正在显示同一网站的标签页，按同样规则重新拦截。
+// 这个隐藏页。用户回车后隐藏页被换进可见标签页，发给隐藏页的跳转会丢失——tabs.update
+// 可能报错，也可能照常 resolve（WebKit 只在日志里记 “Tab N was not found”），换入后也
+// 不会再有 onCommitted。所以每次跳转后都在短时间内检查：仍有标签页显示同一网站，就按
+// 同样规则重新拦截。
+const SWAP_FIRST_CHECK_MS = 600;
 const SWAP_POLL_MS = 250;
 const SWAP_POLL_ATTEMPTS = 40; // 约 10 秒
 function recoverSwappedTab(details) {
@@ -273,9 +277,12 @@ function recoverSwappedTab(details) {
   const poll = async () => {
     attempts++;
     let tabs = [];
-    try { tabs = await chrome.tabs.query({}); } catch (e) { /* 继续重试 */ }
+    try { tabs = await chrome.tabs.query({}); } catch (e) { traceNavigation(details, 'swap-query-error', { error: e.message }); }
+    if (attempts === 1 || attempts % 8 === 0) {
+      traceNavigation(details, 'swap-poll', { attempts, tabs: tabs.map(t => `${t.id}${t.active ? '*' : ''}:${t.url ? extractDomain(t.url) : '-'}`).join(',') });
+    }
     const candidates = tabs
-      .filter(tab => tab.id !== details.tabId && tab.url && /^https?:/i.test(tab.url) && extractDomain(tab.url) === host)
+      .filter(tab => tab.url && /^https?:/i.test(tab.url) && extractDomain(tab.url) === host)
       .sort((a, b) => Number(b.active) - Number(a.active));
     if (candidates.length) {
       const tab = candidates[0];
@@ -286,7 +293,7 @@ function recoverSwappedTab(details) {
       setTimeout(poll, SWAP_POLL_MS);
     }
   };
-  setTimeout(poll, SWAP_POLL_MS);
+  setTimeout(poll, SWAP_FIRST_CHECK_MS);
 }
 
 async function interceptCommittedNavigation(details, isCurrent, recovery = false) {
@@ -335,7 +342,7 @@ async function interceptCommittedNavigation(details, isCurrent, recovery = false
       traceNavigation(details, 'redirect-request', { page: 'confirm.html' });
       await chrome.tabs.update(details.tabId, { url: confirmUrl.toString() });
       traceNavigation(details, 'redirect-resolved', { page: 'confirm.html' });
-      return;
+      return true;
     }
   }
 
@@ -357,13 +364,14 @@ async function interceptCommittedNavigation(details, isCurrent, recovery = false
   traceNavigation(details, 'redirect-request', { page: 'redirect.html' });
   await chrome.tabs.update(details.tabId, { url: redirectUrl.toString() });
   traceNavigation(details, 'redirect-resolved', { page: 'redirect.html' });
+  return true;
 }
 
 // 监听扩展安装事件
 chrome.runtime.onInstalled.addListener(async () => {
   // 1.5 迁移：仅清理旧功能字段，保留网站、限额、白名单和拦截统计。
   try {
-    await chrome.storage.local.remove(['avgTime', 'totalSavedTime', 'savedTime', 'disableEndTime', 'disabledUntil']);
+    await chrome.storage.local.remove(['avgTime', 'totalSavedTime', 'savedTime', 'disableEndTime', 'disabledUntil', 'navTrace']);
     const { blockedSites } = await chrome.storage.local.get(['blockedSites']);
     if (Array.isArray(blockedSites) && blockedSites.some(site => 'avgTime' in site)) {
       await chrome.storage.local.set({

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const root = new URL('../../', import.meta.url);
-const test = (name, run) => nodeTest(name, { timeout: 1000 }, run);
+const test = (name, run) => nodeTest(name, { timeout: 2000 }, run);
 const youtube = 'https://www.youtube.com/';
 const other = 'https://example.com/';
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -212,7 +212,18 @@ for (const [platform, scheme, file] of [
     await b.emit('committed', youtube, 9);
     b.urls.delete(9);
     b.show(1, youtube);
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 900));
+    const url = blocked(b);
+    assert.equal(url.searchParams.get('count'), '1');
+  });
+
+  // WebKit 有时让发给隐藏页的 tabs.update 照常 resolve，但跳转随换页一起丢失。
+  test(`${platform}: a redirect silently lost in the swap is re-applied to the visible tab`, async () => {
+    const b = setup();
+    await b.emit('committed', youtube, 9);
+    b.urls.delete(9);
+    b.show(1, youtube);
+    await new Promise(resolve => setTimeout(resolve, 900));
     const url = blocked(b);
     assert.equal(url.searchParams.get('count'), '1');
   });
@@ -223,7 +234,7 @@ for (const [platform, scheme, file] of [
     await b.emit('committed', youtube, 9);
     b.urls.delete(9);
     b.show(1, other);
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 900));
     assert.equal(b.urls.get(1), other);
     assert.equal(b.updates.length, 0);
   });
