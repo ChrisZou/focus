@@ -4,24 +4,28 @@ Focus 1.5 的 Safari Web Extension，附 Swift macOS 安装应用。最低 macOS
 
 ## 构建与运行
 
-在仓库根目录执行（需要完整 Xcode；本机验证版本为 Xcode 26.6）：
+日常使用装 Release 版（公司 Developer ID `W4SX57U6XB` 签名），在仓库根目录执行（需要完整 Xcode；本机验证版本为 Xcode 26.6）：
 
 ```sh
 python3 safari/scripts/sync-resources.py
 xcodebuild -project safari/Focus/Focus.xcodeproj -scheme Focus \
-  -configuration Debug -destination 'platform=macOS' \
+  -configuration Release -destination 'platform=macOS' \
   -derivedDataPath safari/.build build
-open safari/.build/Build/Products/Debug/Focus.app
+pkill -x Focus; rm -rf /Applications/Focus.app
+ditto safari/.build/Build/Products/Release/Focus.app /Applications/Focus.app
+open /Applications/Focus.app
 ```
 
-也可 `open safari/Focus/Focus.xcodeproj`，选择 **Focus → My Mac → Run (⌘R)**。已提交共享 scheme。Debug 默认使用 **Sign to Run Locally**（ad-hoc），无需开发者账号。Release/分发需在两个 target 的 Signing & Capabilities 中选择自己的 Team 和签名方式。
+**不要用 Debug 版日常使用。** Debug 是 ad-hoc 签名，Safari 会把它当成「未签名扩展」（标识带 `(UNSIGNED)`），而「允许未签名的扩展」每次 Safari 退出都会自动关闭，扩展随之静默停用——这就是 Safari 版「总是失效」的原因。Developer ID 签名的扩展不依赖这个开关。也不要直接从 `safari/.build` 运行：重新构建或清理会让注册路径失效。
+
+Release 未公证，仅限本机使用；分发前需 `notarytool` 公证并 staple。Debug 仍可 **Focus → My Mac → Run (⌘R)** 调试。
 
 应用 ID：`com.chriszou.focus.safari`；扩展 ID：`com.chriszou.focus.safari.Extension`。应用仅用于安装和打开 Safari 扩展设置，关闭后不影响扩展运行。
 
 ## 在 Safari 启用
 
 1. 运行 Focus.app，点击「打开 Safari 扩展设置」。
-2. 本地 ad-hoc 构建需先在 **Safari → 设置 → 高级 → 显示网页开发者功能**，再在 **设置 → 开发者 → 允许未签名的扩展** 打勾。Safari 退出后可能需要重新打开此开关。
+2. 仅 Debug（ad-hoc）构建需要 **设置 → 开发者 → 允许未签名的扩展**，且 Safari 每次退出都会重置；Release 版跳过此步。签名版与未签名版在 Safari 中是两个不同的扩展，存储（屏蔽列表、限额、白名单）不互通。
 3. **设置 → 扩展 → Focus** 打勾启用。使用多个 Safari Profile 时，也要在当前 Profile 中启用。
 4. 点击「编辑网站…」，把**所有网站 / 其他网站**设为**允许**；或在工具栏扩展授权提示中选择「始终允许在所有网站上」。不要只授权被屏蔽网站：Focus 还需要观察离开网站的导航，才能正确结束一次访问。
 5. 在普通窗口新开 `https://www.youtube.com/`，应跳到 Focus 专注页。工具栏 Focus 弹窗可打开设置、配置限额与白名单。
