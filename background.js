@@ -195,7 +195,7 @@ function hasDailyLimit(site) {
 }
 
 // 更新访问统计
-async function updateVisitStats(blockedSite) {
+async function updateVisitStats(blockedSite, increment = true) {
   const today = getTodayString();
   const userId = await getUserId();
 
@@ -211,13 +211,11 @@ async function updateVisitStats(blockedSite) {
     stats[today][blockedSite.domain] = 0;
   }
 
-  // 增加拦截计数
-  stats[today][blockedSite.domain]++;
-
-  // 保存更新后的统计数据
-  await chrome.storage.local.set({
-    visitStats: stats
-  });
+  // 增加拦截计数（同一次拦截的补救跳转不重复计数）
+  if (increment) {
+    stats[today][blockedSite.domain]++;
+    await chrome.storage.local.set({ visitStats: stats });
+  }
 
   return {
     todayCount: stats[today][blockedSite.domain]
@@ -248,17 +246,50 @@ chrome.webNavigation.onBeforeNavigate.addListener(onBeforeNavigate);
 function onCommitted(details) {
   if (details.frameId !== 0) return;
   traceNavigation(details, 'committed');
-  const navigation = {};
-  tabNavigations.set(details.tabId, navigation);
-  const isCurrent = () => tabNavigations.get(details.tabId) === navigation;
-  return interceptCommittedNavigation(details, isCurrent).catch(error => {
-    traceNavigation(details, 'error', { error: error.message });
-    console.error('导航拦截失败:', error);
-  });
+  return startInterception(details, false);
 }
 chrome.webNavigation.onCommitted.addListener(onCommitted);
 
-async function interceptCommittedNavigation(details, isCurrent) {
+function startInterception(details, recovery) {
+  const navigation = {};
+  tabNavigations.set(details.tabId, navigation);
+  const isCurrent = () => tabNavigations.get(details.tabId) === navigation;
+  return interceptCommittedNavigation(details, isCurrent, recovery).catch(error => {
+    traceNavigation(details, 'error', { error: error.message });
+    console.error('导航拦截失败:', error);
+    if (!recovery) recoverSwappedTab(details);
+  });
+}
+
+// Safari 地址栏会「预载最佳匹配」：网站先在隐藏页里加载并提交，导航事件的 tabId 指向
+// 这个隐藏页。用户回车后隐藏页被换进可见标签页，原 tabId 随之失效（tabs.update 报
+// “Tab N was not found”），换入后也不会再有 onCommitted。跳转失败时，在短时间内找到
+// 正在显示同一网站的标签页，按同样规则重新拦截。
+const SWAP_POLL_MS = 250;
+const SWAP_POLL_ATTEMPTS = 40; // 约 10 秒
+function recoverSwappedTab(details) {
+  const host = extractDomain(details.url);
+  let attempts = 0;
+  const poll = async () => {
+    attempts++;
+    let tabs = [];
+    try { tabs = await chrome.tabs.query({}); } catch (e) { /* 继续重试 */ }
+    const candidates = tabs
+      .filter(tab => tab.id !== details.tabId && tab.url && /^https?:/i.test(tab.url) && extractDomain(tab.url) === host)
+      .sort((a, b) => Number(b.active) - Number(a.active));
+    if (candidates.length) {
+      const tab = candidates[0];
+      const replacement = { tabId: tab.id, url: tab.url, frameId: 0 };
+      traceNavigation(replacement, 'swap-recovery', { from: details.tabId });
+      await startInterception(replacement, true);
+    } else if (attempts < SWAP_POLL_ATTEMPTS) {
+      setTimeout(poll, SWAP_POLL_MS);
+    }
+  };
+  setTimeout(poll, SWAP_POLL_MS);
+}
+
+async function interceptCommittedNavigation(details, isCurrent, recovery = false) {
   // 获取域名
   const domain = extractDomain(details.url);
 
@@ -309,7 +340,7 @@ async function interceptCommittedNavigation(details, isCurrent) {
   }
 
   // 更新访问统计（被拦截）
-  const stats = await updateVisitStats(blockedSite);
+  const stats = await updateVisitStats(blockedSite, !recovery);
   if (!isCurrent()) { traceNavigation(details, 'superseded'); return; }
 
   // 构建重定向URL，包含统计信息

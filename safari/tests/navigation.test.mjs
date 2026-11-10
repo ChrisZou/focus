@@ -43,17 +43,22 @@ function browser(source, scheme) {
     tabs: {
       onRemoved: event('removed'),
       async update(tabId, { url }) {
-        if (rejectUpdate) throw new Error('Tab no longer exists');
+        if (rejectUpdate === true || rejectUpdate === tabId) throw new Error('Tab no longer exists');
         updates.push({ tabId, url });
         urls.set(tabId, url);
       },
+      async query() {
+        return [...urls].map(([id, url]) => ({ id, url, active: id === activeTab }));
+      },
     },
   };
-  vm.runInNewContext(source, { chrome, URL, console: { error: (...args) => errors.push(args) } });
+  let activeTab = 1;
+  vm.runInNewContext(source, { chrome, URL, setTimeout, console: { error: (...args) => errors.push(args) } });
   return {
     local, session, urls, updates, errors,
     pause(key) { pauseRead = { ...deferred(), key }; return pauseRead; },
     rejectUpdates(value = true) { rejectUpdate = value; },
+    show(tabId, url) { urls.set(tabId, url); activeTab = tabId; },
     async emit(name, url, tabId = 1, frameId = 0) {
       if (name === 'committed' && frameId === 0) urls.set(tabId, url);
       await handlers[name]?.({ url, tabId, frameId });
@@ -197,5 +202,29 @@ for (const [platform, scheme, file] of [
     b.rejectUpdates(false);
     await b.emit('committed', youtube);
     blocked(b);
+  });
+
+  // Safari 预载地址栏最佳匹配：在隐藏页（tab 9）提交，回车后换进可见标签页（tab 1），
+  // 隐藏页 id 失效且不再有 onCommitted。
+  test(`${platform}: a preloaded page swapped into a visible tab is still blocked`, async () => {
+    const b = setup();
+    b.rejectUpdates(9);
+    await b.emit('committed', youtube, 9);
+    b.urls.delete(9);
+    b.show(1, youtube);
+    await new Promise(resolve => setTimeout(resolve, 400));
+    const url = blocked(b);
+    assert.equal(url.searchParams.get('count'), '1');
+  });
+
+  test(`${platform}: swap recovery gives up when no tab shows the site`, async () => {
+    const b = setup();
+    b.rejectUpdates(9);
+    await b.emit('committed', youtube, 9);
+    b.urls.delete(9);
+    b.show(1, other);
+    await new Promise(resolve => setTimeout(resolve, 400));
+    assert.equal(b.urls.get(1), other);
+    assert.equal(b.updates.length, 0);
   });
 }

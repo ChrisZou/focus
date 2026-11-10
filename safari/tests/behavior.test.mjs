@@ -33,13 +33,14 @@ function background(seed = {}) {
         if (rejectUpdates) throw new Error('Tab no longer exists');
         updates.push({ tabId, ...properties });
       },
+      query: async () => [],
     },
   };
   class Clock extends Date {
     constructor(...args) { super(...(args.length ? args : [now])); }
     static now() { return now.getTime(); }
   }
-  const context = vm.createContext({ chrome, URL, console: { ...console, debug() {} }, Date: Clock });
+  const context = vm.createContext({ chrome, URL, setTimeout, console: { ...console, debug() {} }, Date: Clock });
   vm.runInContext(read('background.js'), context);
   return {
     local, session, updates, listeners,
