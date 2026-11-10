@@ -4,7 +4,7 @@ Focus 1.5 的 Safari Web Extension，附 Swift macOS 安装应用。最低 macOS
 
 ## 构建与运行
 
-日常使用装 Release 版（公司 Developer ID `W4SX57U6XB` 签名），在仓库根目录执行（需要完整 Xcode；本机验证版本为 Xcode 26.6）：
+日常使用装 Release 版（公司团队 `W4SX57U6XB` 的 Apple Development 证书签名），在仓库根目录执行（需要完整 Xcode；本机验证版本为 Xcode 26.6）：
 
 ```sh
 python3 safari/scripts/sync-resources.py
@@ -16,9 +16,9 @@ ditto safari/.build/Build/Products/Release/Focus.app /Applications/Focus.app
 open /Applications/Focus.app
 ```
 
-**不要用 Debug 版日常使用。** Debug 是 ad-hoc 签名，Safari 会把它当成「未签名扩展」（标识带 `(UNSIGNED)`），而「允许未签名的扩展」每次 Safari 退出都会自动关闭，扩展随之静默停用——这就是 Safari 版「总是失效」的原因。Developer ID 签名的扩展不依赖这个开关。也不要直接从 `safari/.build` 运行：重新构建或清理会让注册路径失效。
+**不要用 Debug 版日常使用。** Debug 是 ad-hoc 签名，Safari 会把它当成「未签名扩展」（标识带 `(UNSIGNED)`），而「允许未签名的扩展」每次 Safari 退出都会自动关闭，扩展随之静默停用——这就是 Safari 版「总是失效」的原因。团队签名的扩展不依赖这个开关。也不要直接从 `safari/.build` 运行：重新构建或清理会让注册路径失效。
 
-Release 未公证，仅限本机使用；分发前需 `notarytool` 公证并 staple。Debug 仍可 **Focus → My Mac → Run (⌘R)** 调试。
+不要改用未公证的 Developer ID 签名：Safari 会报 “Computing the code signing dictionary failed”，扩展列表里根本不出现。分发时用 Developer ID 签名并 `notarytool` 公证、staple。Debug 仍可 **Focus → My Mac → Run (⌘R)** 调试。
 
 应用 ID：`com.chriszou.focus.safari`；扩展 ID：`com.chriszou.focus.safari.Extension`。应用仅用于安装和打开 Safari 扩展设置，关闭后不影响扩展运行。
 
