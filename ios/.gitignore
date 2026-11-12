@@ -1,0 +1,19 @@
+# Local build products and Xcode user state
+.build/
+build/
+DerivedData/
+*.xcresult/
+xcuserdata/
+*.xcuserstate
+.swiftpm/
+.DS_Store
+
+# Local signing overrides and credentials are never project inputs.
+Configuration/Local.xcconfig
+.env
+.env.*
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+*.log

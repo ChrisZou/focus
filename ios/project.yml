@@ -1,0 +1,127 @@
+name: Focus
+options:
+  minimumXcodeGenVersion: 2.42.0
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: zh-Hans
+  knownRegions:
+    - zh-Hans
+    - en
+    - Base
+  createIntermediateGroups: true
+  groupSortPosition: top
+packages:
+  FocusCore:
+    path: FocusCore
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: W4SX57U6XB
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    GENERATE_INFOPLIST_FILE: NO
+targets:
+  Focus:
+    type: application
+    platform: iOS
+    sources:
+      - FocusApp
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chris.focus.ios
+        INFOPLIST_FILE: Configuration/Focus-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Configuration/Focus.entitlements
+    dependencies:
+      - package: FocusCore
+      - sdk: FamilyControls.framework
+      - sdk: DeviceActivity.framework
+      - sdk: ManagedSettings.framework
+      - target: FocusMonitor
+        embed: true
+      - target: FocusShieldConfiguration
+        embed: true
+      - target: FocusShieldAction
+        embed: true
+  FocusMonitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Extensions/Monitor
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chris.focus.ios.monitor
+        INFOPLIST_FILE: Configuration/FocusMonitor-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Configuration/FocusMonitor.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    dependencies:
+      - package: FocusCore
+      - sdk: FamilyControls.framework
+      - sdk: DeviceActivity.framework
+      - sdk: ManagedSettings.framework
+  FocusShieldConfiguration:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Extensions/ShieldConfiguration
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chris.focus.ios.shield-configuration
+        INFOPLIST_FILE: Configuration/FocusShieldConfiguration-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Configuration/FocusShieldConfiguration.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: ManagedSettings.framework
+      - sdk: ManagedSettingsUI.framework
+  FocusShieldAction:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Extensions/ShieldAction
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chris.focus.ios.shield-action
+        INFOPLIST_FILE: Configuration/FocusShieldAction-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Configuration/FocusShieldAction.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: ManagedSettings.framework
+  FocusCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - FocusCore/Tests/FocusCoreTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chris.focus.ios.core-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+        CODE_SIGNING_ALLOWED: NO
+    dependencies:
+      - package: FocusCore
+schemes:
+  Focus:
+    build:
+      targets:
+        Focus: all
+        FocusCoreTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - FocusCoreTests
+    archive:
+      config: Release
